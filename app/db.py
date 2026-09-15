@@ -1,3 +1,4 @@
+import re
 import mysql.connector
 from mysql.connector import pooling
 from typing import Dict, Any, List, Optional
@@ -119,21 +120,44 @@ def get_person_evidence_records(person_id: str) -> Dict[str, Any]:
         )
         visits = cursor.fetchall()
 
-        # FIR records where person or their alias/name is mentioned
-        cursor.execute("SELECT * FROM persons WHERE person_id = %s", (person_id,))
-        p = cursor.fetchone()
+        # FIX 2: Non-overlapping longest-match FIR entity attribution
+        cursor.execute("SELECT * FROM persons")
+        all_persons = cursor.fetchall()
+
+        all_frags = []
+        for p in all_persons:
+            pid = p["person_id"]
+            if p["display_name"] and len(p["display_name"].strip()) >= 3:
+                all_frags.append((pid, p["display_name"].strip()))
+            if p["known_aliases"]:
+                for a in p["known_aliases"].split(","):
+                    cleaned = a.strip()
+                    if len(cleaned) >= 3:
+                        all_frags.append((pid, cleaned))
+
+        # Sort by length descending so longer phrases match first and claim spans
+        all_frags.sort(key=lambda x: len(x[1]), reverse=True)
+
+        cursor.execute("SELECT * FROM fir_records ORDER BY filed_date DESC")
+        all_firs = cursor.fetchall()
         
         firs = []
-        if p:
-            name_fragments = [p["display_name"]]
-            if p["known_aliases"]:
-                name_fragments.extend([a.strip() for a in p["known_aliases"].split(",")])
-            
-            query_conds = " OR ".join(["narrative_text LIKE %s" for _ in name_fragments])
-            params = [f"%{frag}%" for frag in name_fragments]
-            if query_conds:
-                cursor.execute(f"SELECT * FROM fir_records WHERE {query_conds} ORDER BY filed_date DESC", tuple(params))
-                firs = cursor.fetchall()
+        for fir in all_firs:
+            narrative = fir.get("narrative_text", "")
+            matched_spans = []
+            matched_pids = set()
+
+            for pid, frag in all_frags:
+                for m in re.finditer(rf"\b{re.escape(frag)}\b", narrative, re.IGNORECASE):
+                    s, e = m.span()
+                    # Check overlap with already claimed longer spans
+                    overlap = any(not (e <= cs or s >= ce) for (cs, ce, _) in matched_spans)
+                    if not overlap:
+                        matched_spans.append((s, e, pid))
+                        matched_pids.add(pid)
+
+            if person_id in matched_pids:
+                firs.append(fir)
 
         return {
             "cdrs": cdrs,

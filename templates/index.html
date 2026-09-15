@@ -206,10 +206,20 @@
           <span style="font-size: 0.7rem; color: #dc2626; font-weight: 700;">UNDOCUMENTED</span>
         </div>
         <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.75rem;">
-          Heuristic baseline identifying plausible undocumented connections. <em>(Production roadmap: GraphSAGE GNN inductive validation)</em>
+          Heuristic baseline identifying plausible undocumented connections. Click to toggle candidate edge on the graph. <em>(Production roadmap: GraphSAGE GNN inductive validation)</em>
         </p>
         <div id="predictions-list">
           <!-- Populated by JS -->
+        </div>
+
+        <!-- FIX 5: Evaluation & Validation Harness -->
+        <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed #e2e8f0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--navy-700);">Leave-One-Out Validation:</span>
+            <button class="chip-btn" id="btn-run-validation" style="font-size: 0.7rem; padding: 0.2rem 0.55rem; background: #e0e7ff; color: #3730a3; border-color: #c7d2fe;">⚡ Run Validation</button>
+          </div>
+          <div id="validation-result-box" style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.6rem; font-size: 0.75rem;">
+          </div>
         </div>
       </div>
 

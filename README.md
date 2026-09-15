@@ -61,7 +61,7 @@ NexusTrace is an AI-powered criminal network intelligence prototype built for la
 
 ### 1. Clone / Open Project
 ```bash
-cd "c:\Users\ucomu\Downloads\Code Crafters"
+cd your-project-folder
 ```
 
 ### 2. Install Dependencies

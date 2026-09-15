@@ -163,6 +163,8 @@ async def extract_fir(req: FIRExtractRequest):
     extracted = extract_entities_relationships(req.fir_text)
     return extracted
 
+from app.evaluation import evaluate_link_prediction_leave_one_out
+
 @router.get("/api/evidence/{record_type}/{record_id}")
 async def get_evidence_detail(record_type: str, record_id: str):
     """Inspect raw evidentiary records (FIR, CDR, TXN, Prison Visit)."""
@@ -170,3 +172,11 @@ async def get_evidence_detail(record_type: str, record_id: str):
     if not record:
         raise HTTPException(status_code=404, detail="Evidence record not found")
     return {"record_type": record_type, "record_id": record_id, "data": record}
+
+@router.get("/api/evaluate/link-prediction")
+async def evaluate_link_prediction():
+    """
+    Feature / Fix 5: Leave-One-Out validation harness for link prediction baseline.
+    Evaluates recovery rate and mean rank across evidentiary network.
+    """
+    return evaluate_link_prediction_leave_one_out()

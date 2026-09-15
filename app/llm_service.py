@@ -4,6 +4,9 @@ import re
 from typing import Dict, Any, List, Optional
 from app.config import settings
 
+# Verify this model name is still current in Google AI Studio before demo day — SDK/model names change.
+GEMINI_MODEL_NAME = "gemini-1.5-flash"
+
 # Attempt to configure google-generativeai
 gemini_available = False
 try:
@@ -24,7 +27,7 @@ def extract_entities_relationships(fir_text: str) -> Dict[str, Any]:
     if gemini_available and settings.GEMINI_API_KEY:
         try:
             import google.generativeai as genai
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
             
             prompt = f"""
 You are an expert NLP entity and relationship extraction tool for criminal case investigation narratives (First Information Reports - FIRs).
@@ -61,8 +64,23 @@ FIR NARRATIVE:
 
     # Robust Heuristic / Regex Fallback
     phones = re.findall(r"\b[6-9]\d{9}\b", fir_text)
+    phone_set = set(phones)
     vehicles = re.findall(r"\b[A-Z]{2}\s?[0-9]{1,2}\s?[A-Z]{1,2}\s?[0-9]{4}\b", fir_text)
-    accounts = re.findall(r"\b(?:ACC|AC|A/C)?\s?[0-9]{8,16}\b", fir_text)
+
+    # FIX 4: Account regex collision resolution
+    raw_acc_matches = re.findall(r"\b(?:ACC|AC|A/C)\s?[0-9]{4,18}\b|\b[0-9]{8,18}\b", fir_text, re.IGNORECASE)
+    accounts = []
+    for acc in raw_acc_matches:
+        clean_acc = acc.strip()
+        digits_only = re.sub(r"\D", "", clean_acc)
+        if digits_only in phone_set:
+            continue
+        # If no prefix and exactly 10 digits starting with 6-9, skip (phone number)
+        if not re.search(r"^(?:ACC|AC|A/C)", clean_acc, re.IGNORECASE):
+            if len(digits_only) == 10 and digits_only[0] in "6789":
+                continue
+        accounts.append(clean_acc)
+    accounts = list(dict.fromkeys(accounts))
 
     # Common Indian names/words heuristic
     known_names_map = [
@@ -102,7 +120,7 @@ FIR NARRATIVE:
         "persons": extracted_persons,
         "phone_numbers": list(set(phones)),
         "vehicle_numbers": list(set(vehicles)),
-        "account_numbers": list(set(accounts)),
+        "account_numbers": accounts,
         "relationships": extracted_relationships
     }
 
@@ -130,7 +148,7 @@ def explain_person(person_id: str, person_data: Dict[str, Any], graph_metrics: D
     if gemini_available and settings.GEMINI_API_KEY:
         try:
             import google.generativeai as genai
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
             
             prompt = f"""
 You are an objective investigative intelligence assistant for a criminal network analysis platform.
@@ -211,7 +229,7 @@ def answer_graph_query(natural_language_question: str, graph_json: Dict[str, Any
     if gemini_available and settings.GEMINI_API_KEY:
         try:
             import google.generativeai as genai
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
             
             prompt = f"""
 You are the Investigator Copilot for the NexusTrace criminal network intelligence system.
@@ -237,6 +255,21 @@ Graph Edges:
             if clean_text.startswith("```"):
                 clean_text = re.sub(r"^```json\s*|^```\s*|```$", "", clean_text, flags=re.MULTILINE).strip()
             res = json.loads(clean_text)
+            
+            # FIX 1: Ground Gemini's citations against the real graph
+            # Gemini's citations are filtered against the actual graph so the system can never surface a node/edge that doesn't exist — explanations must be grounded, not invented.
+            valid_node_ids = {n["id"] for n in nodes}
+            valid_edge_ids = {e["id"] for e in edges}
+
+            filtered_nodes = [nid for nid in res.get("cited_nodes", []) if nid in valid_node_ids]
+            filtered_edges = [eid for eid in res.get("cited_edges", []) if eid in valid_edge_ids]
+
+            # If both are empty after filtering, fall back to rule-based solver
+            if not filtered_nodes and not filtered_edges:
+                raise ValueError("Gemini returned no valid grounded citations for this graph.")
+
+            res["cited_nodes"] = filtered_nodes
+            res["cited_edges"] = filtered_edges
             return res
         except Exception as e:
             print(f"Gemini answer_graph_query failed, running graph query solver: {e}")
