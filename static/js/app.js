@@ -455,7 +455,10 @@ async function executeCopilotQuery(question) {
     const res = await fetch("/api/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: question.trim() })
+      body: JSON.stringify({
+        question: question.trim(),
+        case_id: currentCaseId || "2026-CR-0417"
+      })
     });
     const data = await res.json();
 

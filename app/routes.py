@@ -25,6 +25,7 @@ templates = Jinja2Templates(directory="templates")
 
 class QueryRequest(BaseModel):
     question: str
+    case_id: Optional[str] = "2026-CR-0417"
 
 class FIRExtractRequest(BaseModel):
     fir_text: str
@@ -61,62 +62,86 @@ from app.db import get_all_cases, get_case_summary
 
 @router.get("/api/cases")
 async def list_cases():
-    """List all registered cases for multi-case analysis."""
+    """Returns list of registered cases for case switcher."""
     return get_all_cases()
 
 @router.get("/api/cases/{case_id}")
-async def get_case(case_id: str):
-    """Retrieve case overview synopsis and metadata."""
+async def get_case_detail(case_id: str):
+    """Returns details and summary of a specific case."""
     return get_case_summary(case_id)
 
 @router.get("/api/graph")
-async def get_graph_data(case_id: Optional[str] = "2026-CR-0417"):
-    """Exposes NetworkX nodes and edges with evidence tiers, centrality scores, and predicted links."""
-    return graph_manager.get_vis_graph(case_id=case_id)
+async def get_network_graph(case_id: Optional[str] = None):
+    """
+    Features 1-4: Returns complete multi-source evidentiary graph with community clusters,
+    betweenness metrics, and multi-tier evidence channels.
+    """
+    data = graph_manager.get_vis_graph(case_id=case_id)
+    return data
 
 @router.get("/api/person/{person_id}")
 async def get_person_details(person_id: str):
+    """
+    Feature 5: Person profile & explainable score decomposition.
+    """
     person = get_person_by_id(person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
-    
+
+    if not graph_manager.metrics:
+        graph_manager.build_graph()
+
+    metrics = graph_manager.metrics.get(person_id, {
+        "degree_centrality": 0,
+        "betweenness_centrality": 0,
+        "betweenness_percentile": 50,
+        "priority": "MEDIUM",
+        "network_role": "Associate"
+    })
+
     evidence = get_person_evidence_records(person_id)
-    return {
-        "person": person,
-        "evidence": evidence
+    cached_exp = get_cached_explanation(person_id)
+
+    source_ids = {
+        "fir_ids": [f["fir_id"] for f in evidence.get("fir_records", [])],
+        "cdr_ids": [c["cdr_id"] for c in evidence.get("cdrs", [])],
+        "txn_ids": [t["txn_id"] for t in evidence.get("financial_transactions", [])],
+        "visit_ids": [v["visit_id"] for v in evidence.get("prison_visits", [])]
     }
 
-@router.get("/api/person/{person_id}/explain")
-async def get_person_explanation(person_id: str, force_regenerate: bool = False):
+    if cached_exp:
+        return {
+            "person_id": person_id,
+            "network_role": cached_exp["network_role"],
+            "priority": cached_exp["priority"],
+            "confidence_pct": cached_exp["confidence_pct"],
+            "explanation_text": cached_exp["explanation_text"],
+            "person": person,
+            "metrics": metrics,
+            "source_records": source_ids,
+            "source": "database_cached"
+        }
+
+    # Generate live explanation
+    explanation_res = explain_person(person_id, person, metrics, evidence)
+    return {
+        **explanation_res,
+        "person": person,
+        "metrics": metrics,
+        "source_records": source_ids,
+        "source": "live_generated"
+    }
+
+@router.get("/api/explain/{person_id}")
+async def generate_live_explanation(person_id: str):
     """
-    Feature 4: 'Why this person?' panel
-    Pulls centrality scores + connected evidence, checks cache or calls Gemini explain_person(),
-    returns network role, priority, confidence %, explanation, and source record IDs.
+    Feature 5 & Job 2: Forces generation of fresh Gemini/rule-based explanation.
     """
     person = get_person_by_id(person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
 
-    # Check cache first if not forced
-    if not force_regenerate:
-        cached = get_cached_explanation(person_id)
-        if cached:
-            evidence = get_person_evidence_records(person_id)
-            source_ids = {
-                "fir_ids": [f["fir_id"] for f in evidence.get("fir_records", [])],
-                "cdr_ids": [c["cdr_id"] for c in evidence.get("cdrs", [])],
-                "txn_ids": [t["txn_id"] for t in evidence.get("financial_transactions", [])],
-                "visit_ids": [v["visit_id"] for v in evidence.get("prison_visits", [])]
-            }
-            return {
-                **cached,
-                "person": person,
-                "source_records": source_ids,
-                "source": "database_cache"
-            }
-
-    # Ensure graph metrics are calculated
-    if person_id not in graph_manager.metrics:
+    if not graph_manager.metrics:
         graph_manager.build_graph()
 
     metrics = graph_manager.metrics.get(person_id, {
@@ -130,7 +155,6 @@ async def get_person_explanation(person_id: str, force_regenerate: bool = False)
     evidence = get_person_evidence_records(person_id)
     explanation_res = explain_person(person_id, person, metrics, evidence)
 
-    # Save to explanations table
     save_explanation(
         person_id=person_id,
         network_role=explanation_res["network_role"],
@@ -149,6 +173,7 @@ async def get_person_explanation(person_id: str, force_regenerate: bool = False)
     return {
         **explanation_res,
         "person": person,
+        "metrics": metrics,
         "source_records": source_ids,
         "source": "live_generated"
     }
@@ -159,8 +184,9 @@ async def copilot_query(req: QueryRequest):
     Feature 6: Investigator Copilot.
     Answers natural language queries using graph reasoning and cites node/edge IDs to highlight.
     """
-    graph_data = graph_manager.get_vis_graph()
-    result = answer_graph_query(req.question, graph_data)
+    case_id = req.case_id or "2026-CR-0417"
+    graph_data = graph_manager.get_vis_graph(case_id=case_id)
+    result = answer_graph_query(req.question, graph_data, case_id=case_id)
     return result
 
 @router.post("/api/extract-fir")
