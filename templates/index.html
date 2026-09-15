@@ -20,21 +20,21 @@
       <div class="logo-icon">NT</div>
       <div>
         <div class="brand-title">NexusTrace</div>
-        <div class="brand-subtitle">SIH26189 — Criminal Network Intelligence Platform</div>
+        <div class="brand-subtitle">SIH26189 — Criminal Network Intelligence</div>
       </div>
     </div>
 
     <div class="header-meta">
       <!-- Multi-Case Dropdown Selector -->
-      <div style="display: flex; align-items: center; gap: 0.4rem;">
-        <span style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-mono);">ACTIVE CASE:</span>
-        <select id="case-selector" style="background: #1e293b; color: #38bdf8; border: 1px solid #3b82f6; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-family: var(--font-mono); outline: none; cursor: pointer;">
-          <option value="2026-CR-0417">Case #2026-CR-0417 (Anna Nagar Financial Fraud)</option>
-          <option value="2026-CR-0512">Case #2026-CR-0512 (Luxury Vehicle Theft Ring)</option>
-          <option value="ALL">All Cases (Cross-Syndicate Grid)</option>
+      <div class="case-select-wrapper">
+        <span class="case-label-tag">CASE:</span>
+        <select id="case-selector" class="case-select-input">
+          <option value="2026-CR-0417">#2026-CR-0417 (Anna Nagar Financial Fraud)</option>
+          <option value="2026-CR-0512">#2026-CR-0512 (Luxury Vehicle Theft Ring)</option>
+          <option value="ALL">All Registered Cases (Cross-Grid)</option>
         </select>
       </div>
-      <div class="badge-role">ROLE: Investigating Officer (Level 2)</div>
+      <div class="badge-role">ROLE: IO (Level 2)</div>
     </div>
 
     <nav class="header-nav">
@@ -55,23 +55,26 @@
     <!-- Left Column: Case Summary & Graph View & Copilot & Timeline -->
     <section class="graph-section">
 
-      <!-- Case Summary Card (New) -->
-      <div class="copilot-card" id="case-summary-card" style="padding: 0.9rem 1.25rem; border-left: 4px solid #3b82f6;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
-          <div>
-            <span class="badge-case" id="summary-case-id" style="font-size: 0.75rem;">CASE: #2026-CR-0417</span>
-            <span style="font-size: 0.95rem; font-weight: 700; color: var(--navy-900); margin-left: 0.5rem;" id="summary-case-title">
-              Financial Fraud & Syndicate Money Laundering
+      <!-- Case Summary Card -->
+      <div class="copilot-card" id="case-summary-card" style="padding: 1rem 1.25rem; border-left: 4px solid #3b82f6;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="badge-case" id="summary-case-id" style="font-size: 0.75rem; font-weight: 700;">CASE: #2026-CR-0417</span>
+            <span class="tag-item" id="summary-case-status" style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 4px;">
+              Active Trial Preparation
             </span>
           </div>
-          <span class="tag-item" id="summary-case-status" style="background: #e0f2fe; color: #0369a1; font-size: 0.7rem; font-weight: 600;">
-            Active Trial Preparation
-          </span>
         </div>
-        <p id="summary-case-text" style="font-size: 0.8rem; color: #475569; line-height: 1.45; margin-bottom: 0.4rem;">
+
+        <h2 id="summary-case-title" style="font-size: 1.05rem; font-weight: 700; color: var(--navy-900); margin-bottom: 0.4rem; line-height: 1.35;">
+          Financial Fraud & Syndicate Money Laundering
+        </h2>
+
+        <p id="summary-case-text" style="font-size: 0.8rem; color: #475569; line-height: 1.45; margin-bottom: 0.55rem;">
           Organized syndicate operating fraudulent investment schemes and layered fund transfers between Anna Nagar, Tambaram, and Adyar. Identifies key coordinator bridging financial accounts and prison visitation channels.
         </p>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; font-size: 0.75rem; color: #64748b; font-family: var(--font-mono);">
+
+        <div style="display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; font-size: 0.75rem; color: #64748b; font-family: var(--font-mono); padding-top: 0.35rem; border-top: 1px dashed #e2e8f0;">
           <span>🏢 Station: <strong id="summary-station" style="color: #1e293b;">Anna Nagar PS</strong></span>
           <span>⚖️ Sections: <strong id="summary-sections" style="color: #1e293b;">IPC 420, 120B | BNS 318, 61</strong></span>
           <span>🎯 Key Target: <strong id="summary-primary-target" style="color: #b91c1c;">Karthik Selvam (P17)</strong></span>
