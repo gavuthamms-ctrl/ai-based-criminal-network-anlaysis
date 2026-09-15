@@ -57,10 +57,22 @@ async def get_system_status():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+from app.db import get_all_cases, get_case_summary
+
+@router.get("/api/cases")
+async def list_cases():
+    """List all registered cases for multi-case analysis."""
+    return get_all_cases()
+
+@router.get("/api/cases/{case_id}")
+async def get_case(case_id: str):
+    """Retrieve case overview synopsis and metadata."""
+    return get_case_summary(case_id)
+
 @router.get("/api/graph")
-async def get_graph_data():
+async def get_graph_data(case_id: Optional[str] = "2026-CR-0417"):
     """Exposes NetworkX nodes and edges with evidence tiers, centrality scores, and predicted links."""
-    return graph_manager.get_vis_graph()
+    return graph_manager.get_vis_graph(case_id=case_id)
 
 @router.get("/api/person/{person_id}")
 async def get_person_details(person_id: str):

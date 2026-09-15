@@ -61,11 +61,52 @@ def verify_database_startup() -> Dict[str, Any]:
         
     return status
 
-def get_all_persons() -> List[Dict[str, Any]]:
+CASES_METADATA = {
+    "2026-CR-0417": {
+        "case_id": "2026-CR-0417",
+        "title": "Financial Fraud & Syndicate Money Laundering",
+        "station": "Anna Nagar PS (Chennai Central)",
+        "sections": "IPC 420, 120B | BNS 318, 61",
+        "summary": "Organized syndicate operating fraudulent investment schemes and layered fund transfers between Anna Nagar, Tambaram, and Adyar. Identifies key coordinator bridging financial accounts and prison visitation channels.",
+        "primary_suspect": "Karthik Selvam (P17)",
+        "status": "Active Trial Preparation / Chargesheet Filed"
+    },
+    "2026-CR-0512": {
+        "case_id": "2026-CR-0512",
+        "title": "Interstate Luxury Vehicle Theft & Forged RC Racket",
+        "station": "Porur PS (Crime Branch)",
+        "sections": "IPC 379, 420, 467, 471 | BNS 303, 318, 336",
+        "summary": "Interstate luxury car theft ring altering chassis numbers and forging RTO documents. Financial transfers and CDR tower logs reveal Vikramaditya Seth (P55) funding document forgers and disposal transporters.",
+        "primary_suspect": "Vikramaditya Seth (P55)",
+        "status": "Active Warrants Issued (Sec 73 CrPC)"
+    },
+    "ALL": {
+        "case_id": "ALL",
+        "title": "Unified Multi-Case Criminal Intelligence Grid",
+        "station": "NCRB / State Crime Records Bureau",
+        "sections": "Multi-Jurisdiction Syndicate Intelligence",
+        "summary": "Holistic cross-case intelligence map aggregating all registered FIRs, CDR communications, and financial channels across police stations to detect repeat offenders and inter-case bridges.",
+        "primary_suspect": "Cross-Syndicate Coordinators (P17, P31, P55)",
+        "status": "Inter-Agency Active Monitoring"
+    }
+}
+
+def get_all_cases() -> List[Dict[str, Any]]:
+    return list(CASES_METADATA.values())
+
+def get_case_summary(case_id: str = "2026-CR-0417") -> Dict[str, Any]:
+    return CASES_METADATA.get(case_id, CASES_METADATA["2026-CR-0417"])
+
+def get_all_persons(case_id: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT * FROM persons ORDER BY person_id ASC")
+        if case_id == "2026-CR-0417":
+            cursor.execute("SELECT * FROM persons WHERE person_id IN ('P01','P04','P05','P09','P17','P22','P31','P41') ORDER BY person_id ASC")
+        elif case_id == "2026-CR-0512":
+            cursor.execute("SELECT * FROM persons WHERE person_id IN ('P55','P62','P71','P31') ORDER BY person_id ASC")
+        else:
+            cursor.execute("SELECT * FROM persons ORDER BY person_id ASC")
         return cursor.fetchall()
     finally:
         cursor.close()
@@ -81,11 +122,25 @@ def get_person_by_id(person_id: str) -> Optional[Dict[str, Any]]:
         cursor.close()
         conn.close()
 
-def get_all_relationships() -> List[Dict[str, Any]]:
+def get_all_relationships(case_id: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT * FROM relationships ORDER BY edge_id ASC")
+        if case_id == "2026-CR-0417":
+            cursor.execute("""
+                SELECT * FROM relationships 
+                WHERE person_a_id IN ('P01','P04','P05','P09','P17','P22','P31','P41') 
+                  AND person_b_id IN ('P01','P04','P05','P09','P17','P22','P31','P41')
+                ORDER BY edge_id ASC
+            """)
+        elif case_id == "2026-CR-0512":
+            cursor.execute("""
+                SELECT * FROM relationships 
+                WHERE (person_a_id IN ('P55','P62','P71','P31') AND person_b_id IN ('P55','P62','P71','P31'))
+                ORDER BY edge_id ASC
+            """)
+        else:
+            cursor.execute("SELECT * FROM relationships ORDER BY edge_id ASC")
         return cursor.fetchall()
     finally:
         cursor.close()

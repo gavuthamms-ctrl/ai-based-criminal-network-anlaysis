@@ -1,13 +1,15 @@
-// NexusTrace Main Dashboard Logic (Investigation-Ready)
+// NexusTrace Main Dashboard Logic (Investigation-Ready & Multi-Case)
 
 let network = null;
 let graphData = null;
 let edgesDataSet = null;
 let nodesDataSet = null;
-let currentSelectedPersonId = "P17"; // default to the primary coordinator
+let currentSelectedPersonId = "P17";
+let activeCaseId = "2026-CR-0417";
 
 document.addEventListener("DOMContentLoaded", () => {
-  initGraph();
+  setupCaseSelector();
+  loadCaseData(activeCaseId);
   setupCopilot();
   setupModal();
   setupControls();
@@ -16,13 +18,40 @@ document.addEventListener("DOMContentLoaded", () => {
   setupVerificationActions();
 });
 
-async function initGraph() {
+function setupCaseSelector() {
+  const selector = document.getElementById("case-selector");
+  if (!selector) return;
+
+  selector.addEventListener("change", (e) => {
+    activeCaseId = e.target.value;
+    loadCaseData(activeCaseId);
+  });
+}
+
+async function loadCaseData(caseId) {
+  // Update Case Summary Banner
   try {
-    const res = await fetch("/api/graph");
-    graphData = await res.json();
+    const resSummary = await fetch(`/api/cases/${caseId}`);
+    const summary = await resSummary.json();
+    
+    document.getElementById("summary-case-id").innerText = `CASE: #${summary.case_id}`;
+    document.getElementById("summary-case-title").innerText = summary.title;
+    document.getElementById("summary-case-text").innerText = summary.summary;
+    document.getElementById("summary-station").innerText = summary.station;
+    document.getElementById("summary-sections").innerText = summary.sections;
+    document.getElementById("summary-primary-target").innerText = summary.primary_suspect;
+    document.getElementById("summary-case-status").innerText = summary.status;
+    document.getElementById("graph-case-label").innerText = `Case #${summary.case_id}`;
+  } catch (err) {
+    console.error("Failed to load case summary:", err);
+  }
+
+  // Load Graph Data for this Case
+  try {
+    const resGraph = await fetch(`/api/graph?case_id=${caseId}`);
+    graphData = await resGraph.json();
 
     const container = document.getElementById("network-canvas");
-    
     const options = {
       nodes: {
         shape: "dot",
@@ -63,11 +92,14 @@ async function initGraph() {
     });
 
     renderPredictions(graphData.predicted_links);
-    loadPersonExplanation("P17");
-    loadTimeline();
+
+    // Auto-select primary coordinator for the active case
+    const defaultPerson = caseId === "2026-CR-0512" ? "P55" : "P17";
+    loadPersonExplanation(defaultPerson);
+    loadTimeline(caseId);
 
   } catch (err) {
-    console.error("Failed to load graph:", err);
+    console.error("Failed to load case graph:", err);
   }
 }
 
@@ -82,7 +114,7 @@ async function loadPersonExplanation(personId, forceRegen = false) {
     const p = data.person || {};
     const prio = data.priority || "MEDIUM";
 
-    document.getElementById("panel-person-id").innerText = `NODE: ${personId}`;
+    document.getElementById("panel-person-id").innerText = `SUSPECT ID: ${personId}`;
     document.getElementById("panel-person-name").innerText = p.display_name || personId;
     document.getElementById("panel-person-aliases").innerText = `Aliases: ${p.known_aliases || 'None recorded'} | Mobile: ${p.phone_number || 'N/A'}`;
     
@@ -96,17 +128,16 @@ async function loadPersonExplanation(personId, forceRegen = false) {
     document.getElementById("panel-role").innerText = data.network_role || "Associate";
 
     // Lookup node metrics
-    const nodeObj = graphData.nodes.find(n => n.id === personId);
+    const nodeObj = graphData && graphData.nodes ? graphData.nodes.find(n => n.id === personId) : null;
     if (nodeObj && nodeObj.data && nodeObj.data.metrics) {
       const m = nodeObj.data.metrics;
       document.getElementById("panel-betweenness").innerText = `${m.betweenness_centrality} (${m.betweenness_percentile}th percentile)`;
       document.getElementById("panel-legal-sections").innerText = m.legal_sections || "IPC 420";
       document.getElementById("panel-custody-status").innerText = `Status: ${m.custody_status || 'Under Probe'}`;
 
-      // Render Score Decomposition Breakdown (Feature 5)
       renderScoreDecomposition(m.score_breakdown);
     }
-    document.getElementById("panel-resolution-conf").innerText = `${Math.round((p.resolution_confidence || 1.0) * 100)}% (Verified)`;
+    document.getElementById("panel-resolution-conf").innerText = `${Math.round((p.resolution_confidence || 1.0) * 100)}% (Verified Identity)`;
 
     // Explanation text
     document.getElementById("panel-explanation-text").innerText = data.explanation_text || "No explanation available.";
@@ -219,11 +250,8 @@ function renderPredictions(predictions) {
     item.id = `card_${predEdgeId}`;
     item.innerHTML = `
       <div class="prediction-header">
-        <span class="prediction-pair">${p.person_a_id} ↔ ${p.person_b_id}</span>
+        <span class="prediction-pair">${p.person_a_name} ↔ ${p.person_b_name}</span>
         <span class="prediction-conf" id="badge_${predEdgeId}">SCORE: ${(p.confidence_score * 100).toFixed(0)}%</span>
-      </div>
-      <div style="font-size:0.72rem; color:#475569;">
-        ${p.person_a_name} & ${p.person_b_name}
       </div>
       <div style="font-size:0.72rem; color:#7f1d1d; margin-top:0.2rem;">
         ${p.note}
@@ -270,13 +298,13 @@ function togglePredictedEdge(p, predEdgeId) {
   }
 }
 
-// Feature 2: Chronological Timeline
-async function loadTimeline() {
+// Chronological Timeline
+async function loadTimeline(caseId = "2026-CR-0417") {
   const container = document.getElementById("timeline-container");
   if (!container) return;
 
   try {
-    const res = await fetch("/api/timeline");
+    const res = await fetch(`/api/timeline`);
     const events = await res.json();
 
     container.innerHTML = "";
@@ -314,7 +342,6 @@ function setupTimeline() {
   }
 }
 
-// Feature 6: Human Verification Action Sign-off
 function setupVerificationActions() {
   const btnAccept = document.getElementById("btn-verify-accept");
   const btnReject = document.getElementById("btn-verify-reject");
@@ -400,6 +427,17 @@ function setupCopilot() {
   });
 }
 
+// Helper to get person name by ID
+function getPersonDisplayName(personId) {
+  if (graphData && graphData.nodes) {
+    const node = graphData.nodes.find(n => n.id === personId);
+    if (node && node.data && node.data.display_name) {
+      return `${node.data.display_name} (${personId})`;
+    }
+  }
+  return personId;
+}
+
 async function executeCopilotQuery(question) {
   if (!question || !question.trim()) return;
 
@@ -409,7 +447,7 @@ async function executeCopilotQuery(question) {
 
   resBox.style.display = "block";
   textBox.innerHTML = "<em>Analyzing network topology and evidence records...</em>";
-  citeBox.innerHTML = "<span class='cited-label'>Cited Entities:</span>";
+  citeBox.innerHTML = "<span class='cited-label'>Cited Suspects:</span>";
 
   try {
     const res = await fetch("/api/query", {
@@ -424,11 +462,12 @@ async function executeCopilotQuery(question) {
     const citedNodes = data.cited_nodes || [];
     const citedEdges = data.cited_edges || [];
 
-    citeBox.innerHTML = "<span class='cited-label'>Cited Entities:</span>";
+    citeBox.innerHTML = "<span class='cited-label'>Cited Suspects:</span>";
     citedNodes.forEach(nid => {
       const badge = document.createElement("span");
       badge.className = "cited-item";
-      badge.innerText = `Node: ${nid}`;
+      // Replace "Node: P17" with full name "Karthik Selvam (P17)"
+      badge.innerText = `👤 ${getPersonDisplayName(nid)}`;
       badge.onclick = () => {
         loadPersonExplanation(nid);
         highlightGraphItems([nid], citedEdges);
@@ -439,7 +478,7 @@ async function executeCopilotQuery(question) {
     citedEdges.forEach(eid => {
       const badge = document.createElement("span");
       badge.className = "cited-item";
-      badge.innerText = `Edge: ${eid}`;
+      badge.innerText = `🔗 Link: ${eid.replace('e_', '').replace('_', ' ↔ ')}`;
       citeBox.appendChild(badge);
     });
 
@@ -481,7 +520,7 @@ function setupValidation() {
     valBtn.disabled = true;
     valBtn.innerText = "Running...";
     valBox.style.display = "block";
-    valBox.innerHTML = "<em>Executing leave-one-out validation on 6-edge evidentiary graph...</em>";
+    valBox.innerHTML = "<em>Executing leave-one-out validation on evidentiary graph...</em>";
 
     try {
       const res = await fetch("/api/evaluate/link-prediction");
@@ -535,7 +574,6 @@ async function viewEvidenceRecord(recordType, recordId) {
     const prov = rec._provenance || {};
 
     let html = `
-      <!-- Statutory Chain of Custody Box -->
       <div style="background:#0f172a; color:#f8fafc; padding:0.85rem; border-radius:6px; margin-bottom:1rem; font-size:0.76rem; font-family:var(--font-mono); line-height:1.5;">
         <div style="color:#38bdf8; font-weight:700; margin-bottom:0.25rem;">⚖️ STATUTORY CHAIN OF CUSTODY (Sec 65B BSA Certified)</div>
         <div>• Authority: <strong>${prov.legal_authority || 'Sec 91 CrPC Notice'}</strong></div>

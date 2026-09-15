@@ -1,6 +1,6 @@
 import networkx as nx
 import community as community_louvain
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from app.db import get_all_persons, get_all_relationships
 
 # Production upgrade note:
@@ -70,9 +70,9 @@ LEGAL_CASE_METADATA = {
         "station_jurisdiction": "Adyar PS"
     },
     "P31": {
-        "sections": "IPC 420 (Financial Facilitator)",
+        "sections": "IPC 420 / 411 (Financial & Vehicle Facilitator)",
         "custody_status": "Interrogated (Sec 41A CrPC Notice)",
-        "station_jurisdiction": "Porur PS"
+        "station_jurisdiction": "Porur PS (Cross-Case Suspect)"
     },
     "P22": {
         "sections": "Hawala Receiver / Sec 3/4 PMLA",
@@ -83,6 +83,21 @@ LEGAL_CASE_METADATA = {
         "sections": "Witness Statement",
         "custody_status": "Complainant / Witness",
         "station_jurisdiction": "Perambur PS"
+    },
+    "P55": {
+        "sections": "IPC 379 / 420 / 467 / 471 (RTO Forgery)",
+        "custody_status": "Kingpin / Wanted (NBW Issued)",
+        "station_jurisdiction": "Porur PS (Case #2026-CR-0512)"
+    },
+    "P62": {
+        "sections": "IPC 468 / 471 (Document Forger)",
+        "custody_status": "Detained for Interrogation",
+        "station_jurisdiction": "Porur PS"
+    },
+    "P71": {
+        "sections": "IPC 411 / 120B (Vehicle Transporter)",
+        "custody_status": "Arrested in Transit",
+        "station_jurisdiction": "Porur PS"
     }
 }
 
@@ -94,11 +109,11 @@ class NetworkGraphManager:
         self.metrics = {}
         self.communities = {}
 
-    def build_graph(self) -> nx.Graph:
-        """Constructs NetworkX graph from MySQL database records."""
+    def build_graph(self, case_id: Optional[str] = None) -> nx.Graph:
+        """Constructs NetworkX graph from MySQL database records with case filtering."""
         self.G = nx.Graph()
-        persons = get_all_persons()
-        relationships = get_all_relationships()
+        persons = get_all_persons(case_id=case_id)
+        relationships = get_all_relationships(case_id=case_id)
 
         self.persons_cache = {p["person_id"]: p for p in persons}
         self.relationships_cache = relationships
@@ -179,7 +194,7 @@ class NetworkGraphManager:
             structural_points = round(pct * 0.35, 1)
             evidence_points = round(min(30.0, deg_k * 8.0), 1)
             identity_points = round(p_conf * 20.0, 1)
-            telecom_points = 15.0 if node in ["P17", "P31"] else 5.0
+            telecom_points = 15.0 if node in ["P17", "P31", "P55"] else 5.0
             
             total_calc_score = int(min(95, structural_points + evidence_points + identity_points + telecom_points))
 
@@ -244,9 +259,9 @@ class NetworkGraphManager:
         predictions.sort(key=lambda x: x["confidence_score"], reverse=True)
         return predictions[:top_k]
 
-    def get_vis_graph(self) -> Dict[str, Any]:
+    def get_vis_graph(self, case_id: Optional[str] = None) -> Dict[str, Any]:
         """Formats nodes and edges for Vis.js Network visualization with tier styles."""
-        self.build_graph()
+        self.build_graph(case_id=case_id)
         
         COMMUNITY_COLORS = {
             0: {"bg": "#3b82f6", "border": "#1d4ed8"},
@@ -260,6 +275,8 @@ class NetworkGraphManager:
             metric = self.metrics.get(node_id, {})
             comm = metric.get("community_id", 0)
             priority = metric.get("priority", "LOW")
+            p_info = self.persons_cache.get(node_id, {})
+            p_name = p_info.get("display_name", node_id)
             
             if priority == "HIGH":
                 node_color = {"background": "#dc2626", "border": "#991b1b", "highlight": {"background": "#ef4444", "border": "#7f1d1d"}}
@@ -273,20 +290,20 @@ class NetworkGraphManager:
                 size = 22
                 shape = "dot"
 
-            p_info = self.persons_cache.get(node_id, {})
+            # Display person's full name first, with ID in parentheses
             vis_nodes.append({
                 "id": node_id,
-                "label": f"{node_id}\n{p_info.get('display_name', '')}",
-                "title": f"<b>{p_info.get('display_name')}</b> ({node_id})<br>Role: {metric.get('network_role')}<br>Status: {metric.get('custody_status')}<br>Sections: {metric.get('legal_sections')}",
+                "label": f"{p_name}\n({node_id})",
+                "title": f"<b>{p_name}</b> ({node_id})<br>Role: {metric.get('network_role')}<br>Status: {metric.get('custody_status')}<br>Sections: {metric.get('legal_sections')}",
                 "color": node_color,
                 "size": size,
                 "shape": shape,
-                "font": {"color": font_color, "size": 13, "face": "Inter, system-ui, sans-serif"},
+                "font": {"color": font_color, "size": 12, "face": "Inter, system-ui, sans-serif"},
                 "borderWidth": 2,
                 "shadow": True,
                 "data": {
                     "person_id": node_id,
-                    "display_name": p_info.get("display_name"),
+                    "display_name": p_name,
                     "aliases": p_info.get("known_aliases"),
                     "phone": p_info.get("phone_number"),
                     "vehicle": p_info.get("vehicle_number"),

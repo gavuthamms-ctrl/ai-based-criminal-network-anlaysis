@@ -25,7 +25,15 @@
     </div>
 
     <div class="header-meta">
-      <div class="badge-case">CASE: #2026-CR-0417</div>
+      <!-- Multi-Case Dropdown Selector -->
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <span style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-mono);">ACTIVE CASE:</span>
+        <select id="case-selector" style="background: #1e293b; color: #38bdf8; border: 1px solid #3b82f6; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-family: var(--font-mono); outline: none; cursor: pointer;">
+          <option value="2026-CR-0417">Case #2026-CR-0417 (Anna Nagar Financial Fraud)</option>
+          <option value="2026-CR-0512">Case #2026-CR-0512 (Luxury Vehicle Theft Ring)</option>
+          <option value="ALL">All Cases (Cross-Syndicate Grid)</option>
+        </select>
+      </div>
       <div class="badge-role">ROLE: Investigating Officer (Level 2)</div>
     </div>
 
@@ -44,14 +52,37 @@
   <!-- Main Dashboard Grid -->
   <main class="dashboard-grid">
     
-    <!-- Left Column: Graph View & Copilot & Timeline -->
+    <!-- Left Column: Case Summary & Graph View & Copilot & Timeline -->
     <section class="graph-section">
+
+      <!-- Case Summary Card (New) -->
+      <div class="copilot-card" id="case-summary-card" style="padding: 0.9rem 1.25rem; border-left: 4px solid #3b82f6;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
+          <div>
+            <span class="badge-case" id="summary-case-id" style="font-size: 0.75rem;">CASE: #2026-CR-0417</span>
+            <span style="font-size: 0.95rem; font-weight: 700; color: var(--navy-900); margin-left: 0.5rem;" id="summary-case-title">
+              Financial Fraud & Syndicate Money Laundering
+            </span>
+          </div>
+          <span class="tag-item" id="summary-case-status" style="background: #e0f2fe; color: #0369a1; font-size: 0.7rem; font-weight: 600;">
+            Active Trial Preparation
+          </span>
+        </div>
+        <p id="summary-case-text" style="font-size: 0.8rem; color: #475569; line-height: 1.45; margin-bottom: 0.4rem;">
+          Organized syndicate operating fraudulent investment schemes and layered fund transfers between Anna Nagar, Tambaram, and Adyar. Identifies key coordinator bridging financial accounts and prison visitation channels.
+        </p>
+        <div style="display: flex; gap: 1.2rem; font-size: 0.75rem; color: #64748b; font-family: var(--font-mono);">
+          <span>🏢 Station: <strong id="summary-station" style="color: #1e293b;">Anna Nagar PS</strong></span>
+          <span>⚖️ Sections: <strong id="summary-sections" style="color: #1e293b;">IPC 420, 120B | BNS 318, 61</strong></span>
+          <span>🎯 Key Target: <strong id="summary-primary-target" style="color: #b91c1c;">Karthik Selvam (P17)</strong></span>
+        </div>
+      </div>
       
       <!-- Graph Card -->
       <div class="graph-card">
         <div class="card-header">
           <div class="card-title">
-            <span>🌐</span> Multi-Source Network Graph (Case #2026-CR-0417)
+            <span>🌐</span> Multi-Source Network Graph (<span id="graph-case-label">Case #2026-CR-0417</span>)
           </div>
           <div style="display: flex; gap: 0.5rem;">
             <button class="chip-btn" id="btn-fit-graph" title="Center & Zoom Graph">Fit View</button>
@@ -99,16 +130,16 @@
         </div>
 
         <!-- Query Chips -->
-        <div class="copilot-chips">
-          <button class="chip-btn copilot-chip" data-q="Who connects P17 and P22?">Who connects P17 and P22?</button>
+        <div class="copilot-chips" id="copilot-chips-container">
+          <button class="chip-btn copilot-chip" data-q="Who connects Karthik Selvam and Dinesh Prabhakaran?">Path to Dinesh Prabhakaran</button>
           <button class="chip-btn copilot-chip" data-q="Identify key coordinators bridging clusters">Identify key coordinators</button>
-          <button class="chip-btn copilot-chip" data-q="Show the connection path between P05 and P17">Path between P05 and P17</button>
+          <button class="chip-btn copilot-chip" data-q="Who connects Suresh Babu and Karthik Selvam?">Path between Suresh Babu & Karthik</button>
           <button class="chip-btn copilot-chip" data-q="Summarize the entire evidentiary network">Network Summary</button>
         </div>
 
         <!-- Input Box -->
         <div class="copilot-input-row">
-          <input type="text" id="copilot-input" class="copilot-input" placeholder="Ask a question about the criminal network (e.g. 'Who connects P17 and P22?')..." />
+          <input type="text" id="copilot-input" class="copilot-input" placeholder="Ask a question about the criminal network (e.g. 'Who connects Karthik Selvam and Dinesh Prabhakaran?')..." />
           <button id="copilot-submit" class="copilot-submit-btn">
             <span>Query</span> ➔
           </button>
@@ -118,12 +149,12 @@
         <div id="copilot-response" class="copilot-response-box">
           <div id="copilot-text"></div>
           <div id="copilot-citations" class="cited-badges">
-            <span class="cited-label">Cited Entities:</span>
+            <span class="cited-label">Cited Suspects:</span>
           </div>
         </div>
       </div>
 
-      <!-- Investigation Timeline Drawer (Feature 2) -->
+      <!-- Investigation Timeline Drawer -->
       <div class="copilot-card" style="margin-top: 0.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
           <div class="copilot-title">
@@ -132,7 +163,6 @@
           <button class="chip-btn" id="btn-toggle-timeline">Toggle View</button>
         </div>
         <div id="timeline-container" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
-          <!-- Populated by JS -->
         </div>
       </div>
 
@@ -146,8 +176,8 @@
         
         <div class="person-header">
           <div>
-            <div class="person-id-tag" id="panel-person-id">SELECT A NODE</div>
-            <div class="person-name" id="panel-person-name">Click any person node on the graph</div>
+            <div class="person-id-tag" id="panel-person-id">SUSPECT PROFILE</div>
+            <div class="person-name" id="panel-person-name">Click any suspect on the graph</div>
             <div class="person-aliases" id="panel-person-aliases">Aliases: --</div>
             <div style="font-size: 0.72rem; color: #b45309; font-weight: 600; margin-top: 0.2rem;" id="panel-custody-status">Status: --</div>
           </div>
@@ -187,7 +217,6 @@
               <span id="panel-decomp-total">Total: 82%</span>
             </div>
             <div id="panel-decomp-bars" style="display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; color: #475569;">
-              <!-- Populated by JS -->
             </div>
           </div>
 
@@ -195,7 +224,7 @@
           <div>
             <div class="metric-section-title">Plain-Language Justification (Gemini / Engine)</div>
             <div class="explanation-box" id="panel-explanation-text">
-              Select an individual node on the left network visualization to inspect calculated centrality metrics, cross-source evidence records, and plain-language explanation.
+              Select an individual suspect on the left network visualization to inspect calculated centrality metrics, cross-source evidence records, and plain-language explanation.
             </div>
           </div>
 
@@ -221,7 +250,6 @@
           <div>
             <div class="metric-section-title">Underlying Source Evidence (Section 65B Certified)</div>
             <div class="evidence-btn-group" id="panel-evidence-buttons">
-              <!-- Rendered via JS -->
             </div>
           </div>
 
@@ -245,7 +273,6 @@
           Heuristic baseline identifying plausible undocumented connections. Click to toggle candidate edge on the graph. <em>(Production roadmap: GraphSAGE GNN inductive validation)</em>
         </p>
         <div id="predictions-list">
-          <!-- Populated by JS -->
         </div>
 
         <!-- FIX 5: Evaluation & Validation Harness -->
@@ -263,7 +290,7 @@
 
   </main>
 
-  <!-- Evidence Inspection Modal (With Chain of Custody) -->
+  <!-- Evidence Inspection Modal -->
   <div class="modal-overlay" id="evidence-modal">
     <div class="modal-content">
       <div class="modal-header">
