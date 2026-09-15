@@ -80,6 +80,7 @@ async def get_network_graph(case_id: Optional[str] = None):
     return data
 
 @router.get("/api/person/{person_id}")
+@router.get("/api/person/{person_id}/explain")
 async def get_person_details(person_id: str):
     """
     Feature 5: Person profile & explainable score decomposition.

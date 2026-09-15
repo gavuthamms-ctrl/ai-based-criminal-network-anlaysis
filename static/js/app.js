@@ -115,9 +115,10 @@ async function loadPersonExplanation(personId, forceRegen = false) {
 
     const p = data.person || {};
     const prio = data.priority || "MEDIUM";
+    const displayName = p.display_name || personId;
 
-    document.getElementById("panel-person-id").innerText = `SUSPECT ID: ${personId}`;
-    document.getElementById("panel-person-name").innerText = p.display_name || personId;
+    document.getElementById("panel-person-id").innerText = `SUSPECT PROFILE`;
+    document.getElementById("panel-person-name").innerText = `${displayName} (${personId})`;
     document.getElementById("panel-person-aliases").innerText = `Aliases: ${p.known_aliases || 'None recorded'} | Mobile: ${p.phone_number || 'N/A'}`;
     
     // Priority badge
