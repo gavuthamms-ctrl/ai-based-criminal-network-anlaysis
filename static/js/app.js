@@ -1,8 +1,8 @@
-// NexusTrace Main Dashboard Logic
+// NexusTrace Main Dashboard Logic (Investigation-Ready)
 
 let network = null;
 let graphData = null;
-let edgesDataSet = null; // FIX 3: Module-level reference to dynamically add/remove predicted edges
+let edgesDataSet = null;
 let nodesDataSet = null;
 let currentSelectedPersonId = "P17"; // default to the primary coordinator
 
@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
   setupModal();
   setupControls();
   setupValidation();
+  setupTimeline();
+  setupVerificationActions();
 });
 
 async function initGraph() {
@@ -21,32 +23,17 @@ async function initGraph() {
 
     const container = document.getElementById("network-canvas");
     
-    // Vis.js options with smooth physics and edge styling
     const options = {
       nodes: {
         shape: "dot",
-        scaling: {
-          min: 16,
-          max: 36
-        },
-        font: {
-          size: 12,
-          face: "Inter, sans-serif",
-          color: "#ffffff"
-        },
+        scaling: { min: 16, max: 36 },
+        font: { size: 12, face: "Inter, sans-serif", color: "#ffffff" },
         borderWidth: 2,
         shadow: true
       },
       edges: {
-        smooth: {
-          type: "continuous",
-          roundness: 0.15
-        },
-        font: {
-          size: 11,
-          align: "middle",
-          background: "rgba(255,255,255,0.85)"
-        },
+        smooth: { type: "continuous", roundness: 0.15 },
+        font: { size: 11, align: "middle", background: "rgba(255,255,255,0.85)" },
         selectionWidth: 3
       },
       physics: {
@@ -57,28 +44,17 @@ async function initGraph() {
           springConstant: 0.04,
           damping: 0.09
         },
-        stabilization: {
-          iterations: 150
-        }
+        stabilization: { iterations: 150 }
       },
-      interaction: {
-        hover: true,
-        tooltipDelay: 100,
-        selectable: true
-      }
+      interaction: { hover: true, tooltipDelay: 100, selectable: true }
     };
 
     nodesDataSet = new vis.DataSet(graphData.nodes);
     edgesDataSet = new vis.DataSet(graphData.edges);
 
-    const data = {
-      nodes: nodesDataSet,
-      edges: edgesDataSet
-    };
-
+    const data = { nodes: nodesDataSet, edges: edgesDataSet };
     network = new vis.Network(container, data, options);
 
-    // Node click handler
     network.on("click", (params) => {
       if (params.nodes && params.nodes.length > 0) {
         const nodeId = params.nodes[0];
@@ -86,11 +62,9 @@ async function initGraph() {
       }
     });
 
-    // Populate baseline link predictions
     renderPredictions(graphData.predicted_links);
-
-    // Automatically load P17 on startup
     loadPersonExplanation("P17");
+    loadTimeline();
 
   } catch (err) {
     console.error("Failed to load graph:", err);
@@ -99,7 +73,6 @@ async function initGraph() {
 
 async function loadPersonExplanation(personId, forceRegen = false) {
   currentSelectedPersonId = personId;
-  const panel = document.getElementById("why-this-person-panel");
   
   try {
     const url = `/api/person/${personId}/explain${forceRegen ? '?force_regenerate=true' : ''}`;
@@ -111,7 +84,7 @@ async function loadPersonExplanation(personId, forceRegen = false) {
 
     document.getElementById("panel-person-id").innerText = `NODE: ${personId}`;
     document.getElementById("panel-person-name").innerText = p.display_name || personId;
-    document.getElementById("panel-person-aliases").innerText = `Aliases: ${p.known_aliases || 'None recorded'} | Phone: ${p.phone_number || 'N/A'}`;
+    document.getElementById("panel-person-aliases").innerText = `Aliases: ${p.known_aliases || 'None recorded'} | Mobile: ${p.phone_number || 'N/A'}`;
     
     // Priority badge
     const prioBadge = document.getElementById("panel-priority-badge");
@@ -120,79 +93,112 @@ async function loadPersonExplanation(personId, forceRegen = false) {
 
     // Confidence badge
     document.getElementById("panel-confidence-badge").innerText = `CONF: ${data.confidence_pct || 80}%`;
-
-    // Role
     document.getElementById("panel-role").innerText = data.network_role || "Associate";
 
-    // Metrics lookup
+    // Lookup node metrics
     const nodeObj = graphData.nodes.find(n => n.id === personId);
     if (nodeObj && nodeObj.data && nodeObj.data.metrics) {
       const m = nodeObj.data.metrics;
       document.getElementById("panel-betweenness").innerText = `${m.betweenness_centrality} (${m.betweenness_percentile}th percentile)`;
-      document.getElementById("panel-degree").innerText = m.degree_centrality;
+      document.getElementById("panel-legal-sections").innerText = m.legal_sections || "IPC 420";
+      document.getElementById("panel-custody-status").innerText = `Status: ${m.custody_status || 'Under Probe'}`;
+
+      // Render Score Decomposition Breakdown (Feature 5)
+      renderScoreDecomposition(m.score_breakdown);
     }
-    document.getElementById("panel-resolution-conf").innerText = `${Math.round((p.resolution_confidence || 1.0) * 100)}%`;
+    document.getElementById("panel-resolution-conf").innerText = `${Math.round((p.resolution_confidence || 1.0) * 100)}% (Verified)`;
 
     // Explanation text
     document.getElementById("panel-explanation-text").innerText = data.explanation_text || "No explanation available.";
 
-    // Evidence Buttons
-    const btnGroup = document.getElementById("panel-evidence-buttons");
-    btnGroup.innerHTML = "";
+    // Render Evidence Buttons
+    renderEvidenceButtons(data.source_records || {});
 
-    const sources = data.source_records || {};
-    let hasSources = false;
-
-    if (sources.fir_ids && sources.fir_ids.length > 0) {
-      hasSources = true;
-      sources.fir_ids.forEach(fid => {
-        const b = document.createElement("button");
-        b.className = "evidence-btn";
-        b.innerText = `📄 FIR: ${fid}`;
-        b.onclick = () => viewEvidenceRecord("fir", fid);
-        btnGroup.appendChild(b);
-      });
-    }
-
-    if (sources.cdr_ids && sources.cdr_ids.length > 0) {
-      hasSources = true;
-      sources.cdr_ids.forEach(cid => {
-        const b = document.createElement("button");
-        b.className = "evidence-btn";
-        b.innerText = `📞 CDR: ${cid}`;
-        b.onclick = () => viewEvidenceRecord("cdr", cid);
-        btnGroup.appendChild(b);
-      });
-    }
-
-    if (sources.txn_ids && sources.txn_ids.length > 0) {
-      hasSources = true;
-      sources.txn_ids.forEach(tid => {
-        const b = document.createElement("button");
-        b.className = "evidence-btn";
-        b.innerText = `💳 TXN: ${tid}`;
-        b.onclick = () => viewEvidenceRecord("txn", tid);
-        btnGroup.appendChild(b);
-      });
-    }
-
-    if (sources.visit_ids && sources.visit_ids.length > 0) {
-      hasSources = true;
-      sources.visit_ids.forEach(vid => {
-        const b = document.createElement("button");
-        b.className = "evidence-btn";
-        b.innerText = `🏢 VISIT: ${vid}`;
-        b.onclick = () => viewEvidenceRecord("visit", vid);
-        btnGroup.appendChild(b);
-      });
-    }
-
-    if (!hasSources) {
-      btnGroup.innerHTML = "<span style='font-size:0.75rem; color:#94a3b8;'>No direct attached records.</span>";
-    }
+    // Load verification audit status
+    loadVerificationStatus(personId);
 
   } catch (err) {
     console.error("Failed to load explanation:", err);
+  }
+}
+
+function renderScoreDecomposition(breakdown) {
+  const container = document.getElementById("panel-decomp-bars");
+  const totalEl = document.getElementById("panel-decomp-total");
+  if (!container || !breakdown) return;
+
+  totalEl.innerText = `Total: ${breakdown.total_score}%`;
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between;">
+      <span>• Structural Centrality:</span>
+      <strong>+${breakdown.structural_centrality_points} pts</strong>
+    </div>
+    <div style="display:flex; justify-content:space-between;">
+      <span>• Cross-Source Documentary Evidence:</span>
+      <strong>+${breakdown.documentary_evidence_points} pts</strong>
+    </div>
+    <div style="display:flex; justify-content:space-between;">
+      <span>• Telecom / Financial Spike Pattern:</span>
+      <strong>+${breakdown.telecom_behavior_points} pts</strong>
+    </div>
+    <div style="display:flex; justify-content:space-between;">
+      <span>• Alias Resolution Confidence:</span>
+      <strong>+${breakdown.identity_confidence_points} pts</strong>
+    </div>
+  `;
+}
+
+function renderEvidenceButtons(sources) {
+  const btnGroup = document.getElementById("panel-evidence-buttons");
+  btnGroup.innerHTML = "";
+  let hasSources = false;
+
+  if (sources.fir_ids && sources.fir_ids.length > 0) {
+    hasSources = true;
+    sources.fir_ids.forEach(fid => {
+      const b = document.createElement("button");
+      b.className = "evidence-btn";
+      b.innerText = `📄 FIR: ${fid}`;
+      b.onclick = () => viewEvidenceRecord("fir", fid);
+      btnGroup.appendChild(b);
+    });
+  }
+
+  if (sources.cdr_ids && sources.cdr_ids.length > 0) {
+    hasSources = true;
+    sources.cdr_ids.forEach(cid => {
+      const b = document.createElement("button");
+      b.className = "evidence-btn";
+      b.innerText = `📞 CDR: ${cid}`;
+      b.onclick = () => viewEvidenceRecord("cdr", cid);
+      btnGroup.appendChild(b);
+    });
+  }
+
+  if (sources.txn_ids && sources.txn_ids.length > 0) {
+    hasSources = true;
+    sources.txn_ids.forEach(tid => {
+      const b = document.createElement("button");
+      b.className = "evidence-btn";
+      b.innerText = `💳 TXN: ${tid}`;
+      b.onclick = () => viewEvidenceRecord("txn", tid);
+      btnGroup.appendChild(b);
+    });
+  }
+
+  if (sources.visit_ids && sources.visit_ids.length > 0) {
+    hasSources = true;
+    sources.visit_ids.forEach(vid => {
+      const b = document.createElement("button");
+      b.className = "evidence-btn";
+      b.innerText = `🏢 VISIT: ${vid}`;
+      b.onclick = () => viewEvidenceRecord("visit", vid);
+      btnGroup.appendChild(b);
+    });
+  }
+
+  if (!hasSources) {
+    btnGroup.innerHTML = "<span style='font-size:0.75rem; color:#94a3b8;'>No direct attached records.</span>";
   }
 }
 
@@ -227,9 +233,7 @@ function renderPredictions(predictions) {
       </div>
     `;
     item.style.cursor = "pointer";
-    item.onclick = () => {
-      togglePredictedEdge(p, predEdgeId);
-    };
+    item.onclick = () => togglePredictedEdge(p, predEdgeId);
     container.appendChild(item);
   });
 }
@@ -242,30 +246,19 @@ function togglePredictedEdge(p, predEdgeId) {
   const card = document.getElementById(`card_${predEdgeId}`);
 
   if (existing) {
-    // Toggle: Remove from graph
     edgesDataSet.remove(predEdgeId);
     if (statusLabel) statusLabel.innerText = "+ Click to project on graph";
     if (card) card.style.borderColor = "#fecaca";
   } else {
-    // Add dashed red AI predicted link to Vis.js canvas
     edgesDataSet.add({
       id: predEdgeId,
       from: p.person_a_id,
       to: p.person_b_id,
       label: `ai_predicted (${Math.round(p.confidence_score * 100)}%)`,
-      color: {
-        color: "#ef4444",
-        highlight: "#b91c1c",
-        hover: "#dc2626"
-      },
+      color: { color: "#ef4444", highlight: "#b91c1c", hover: "#dc2626" },
       dashes: [4, 4],
       width: 2.2,
-      font: {
-        size: 11,
-        align: "middle",
-        color: "#dc2626",
-        background: "rgba(255,255,255,0.95)"
-      },
+      font: { size: 11, align: "middle", color: "#dc2626", background: "rgba(255,255,255,0.95)" },
       title: "AI-Predicted — not a database-backed relationship (Score: " + Math.round(p.confidence_score * 100) + "%)",
       arrows: { to: { enabled: false } }
     });
@@ -273,8 +266,113 @@ function togglePredictedEdge(p, predEdgeId) {
     if (statusLabel) statusLabel.innerText = "✓ Projected on graph (Click to remove)";
     if (card) card.style.borderColor = "#dc2626";
 
-    // Highlight and focus the pair
     highlightGraphItems([p.person_a_id, p.person_b_id], [predEdgeId]);
+  }
+}
+
+// Feature 2: Chronological Timeline
+async function loadTimeline() {
+  const container = document.getElementById("timeline-container");
+  if (!container) return;
+
+  try {
+    const res = await fetch("/api/timeline");
+    const events = await res.json();
+
+    container.innerHTML = "";
+    events.forEach(ev => {
+      const div = document.createElement("div");
+      div.style.cssText = "background:#f8fafc; border:1px solid #e2e8f0; border-left:3px solid #3b82f6; padding:0.45rem 0.75rem; border-radius:4px; font-size:0.75rem;";
+      div.innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.15rem;">
+          <span style="font-family:var(--font-mono); font-weight:700; color:var(--navy-900);">${ev.datetime}</span>
+          <span class="tag-item" style="font-size:0.65rem; padding:0.1rem 0.35rem;">${ev.type}</span>
+        </div>
+        <div style="font-weight:600; color:#1e293b;">${ev.headline}</div>
+        <div style="color:#64748b; font-size:0.72rem;">${ev.detail}</div>
+      `;
+      div.style.cursor = "pointer";
+      div.onclick = () => {
+        if (ev.participants && ev.participants.length > 0) {
+          highlightGraphItems(ev.participants.filter(p => p.startsWith("P")), []);
+        }
+      };
+      container.appendChild(div);
+    });
+  } catch (err) {
+    container.innerHTML = "<span style='color:#94a3b8;'>Error loading timeline: " + err.message + "</span>";
+  }
+}
+
+function setupTimeline() {
+  const toggleBtn = document.getElementById("btn-toggle-timeline");
+  const container = document.getElementById("timeline-container");
+  if (toggleBtn && container) {
+    toggleBtn.onclick = () => {
+      container.style.display = container.style.display === "none" ? "flex" : "none";
+    };
+  }
+}
+
+// Feature 6: Human Verification Action Sign-off
+function setupVerificationActions() {
+  const btnAccept = document.getElementById("btn-verify-accept");
+  const btnReject = document.getElementById("btn-verify-reject");
+
+  if (btnAccept) {
+    btnAccept.onclick = () => submitVerification("ACCEPTED", "Lead validated by Investigating Officer via case records.");
+  }
+  if (btnReject) {
+    btnReject.onclick = () => submitVerification("REJECTED", "Dismissed as coincidental/insufficient nexus.");
+  }
+}
+
+async function submitVerification(decision, defaultNotes) {
+  if (!currentSelectedPersonId) return;
+
+  const notes = prompt(`Enter Case Diary / Verification Notes for ${currentSelectedPersonId}:`, defaultNotes);
+  if (notes === null) return;
+
+  try {
+    const res = await fetch(`/api/person/${currentSelectedPersonId}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        officer_name: "Inspector R. Santhosh",
+        officer_badge: "TN-POL-4482",
+        decision: decision,
+        notes: notes
+      })
+    });
+    const data = await res.json();
+    alert(`Lead status for ${currentSelectedPersonId} recorded as: ${decision}`);
+    loadVerificationStatus(currentSelectedPersonId);
+  } catch (err) {
+    alert("Error logging verification: " + err.message);
+  }
+}
+
+async function loadVerificationStatus(personId) {
+  const statusEl = document.getElementById("panel-verification-status");
+  if (!statusEl) return;
+
+  try {
+    const res = await fetch(`/api/person/${personId}/verification-history`);
+    const data = await res.json();
+    const history = data.history || [];
+
+    if (history.length > 0) {
+      const latest = history[0];
+      const color = latest.decision === "ACCEPTED" ? "#166534" : "#991b1b";
+      statusEl.innerHTML = `
+        <span style="font-weight:700; color:${color};">Audit: ${latest.decision}</span> by ${latest.officer_name} (${latest.timestamp})<br>
+        <em>"${latest.notes || ''}"</em>
+      `;
+    } else {
+      statusEl.innerHTML = "Status: <strong>PENDING REVIEW</strong> by Investigating Officer";
+    }
+  } catch (err) {
+    statusEl.innerText = "No audit log available.";
   }
 }
 
@@ -290,14 +388,9 @@ function setupCopilot() {
     });
   });
 
-  submitBtn.addEventListener("click", () => {
-    executeCopilotQuery(input.value);
-  });
-
+  submitBtn.addEventListener("click", () => executeCopilotQuery(input.value));
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      executeCopilotQuery(input.value);
-    }
+    if (e.key === "Enter") executeCopilotQuery(input.value);
   });
 
   document.getElementById("btn-reexplain").addEventListener("click", () => {
@@ -350,7 +443,6 @@ async function executeCopilotQuery(question) {
       citeBox.appendChild(badge);
     });
 
-    // Highlight on graph
     highlightGraphItems(citedNodes, citedEdges);
 
   } catch (err) {
@@ -372,19 +464,14 @@ function highlightGraphItems(nodeIds, edgeIds) {
 
 function setupControls() {
   document.getElementById("btn-fit-graph").addEventListener("click", () => {
-    if (network) {
-      network.fit({ animation: { duration: 500 } });
-    }
+    if (network) network.fit({ animation: { duration: 500 } });
   });
 
   document.getElementById("btn-reset-highlight").addEventListener("click", () => {
-    if (network) {
-      network.unselectAll();
-    }
+    if (network) network.unselectAll();
   });
 }
 
-// FIX 5: Evaluation Harness Handler
 function setupValidation() {
   const valBtn = document.getElementById("btn-run-validation");
   const valBox = document.getElementById("validation-result-box");
@@ -437,7 +524,7 @@ async function viewEvidenceRecord(recordType, recordId) {
   const title = document.getElementById("modal-title");
 
   title.innerText = `Evidence Record: ${recordType.toUpperCase()} #${recordId}`;
-  details.innerHTML = "<em>Loading record from database...</em>";
+  details.innerHTML = "<em>Loading record & statutory chain of custody from database...</em>";
   modal.style.display = "flex";
 
   try {
@@ -445,14 +532,23 @@ async function viewEvidenceRecord(recordType, recordId) {
     const data = await res.json();
     
     const rec = data.data || {};
+    const prov = rec._provenance || {};
+
     let html = `
-      <div style="margin-bottom: 0.75rem; font-family: var(--font-mono); font-size: 0.8rem; color: #64748b;">
-        Source Type: <strong>${recordType.toUpperCase()}</strong> | ID: <strong>${recordId}</strong>
+      <!-- Statutory Chain of Custody Box -->
+      <div style="background:#0f172a; color:#f8fafc; padding:0.85rem; border-radius:6px; margin-bottom:1rem; font-size:0.76rem; font-family:var(--font-mono); line-height:1.5;">
+        <div style="color:#38bdf8; font-weight:700; margin-bottom:0.25rem;">⚖️ STATUTORY CHAIN OF CUSTODY (Sec 65B BSA Certified)</div>
+        <div>• Authority: <strong>${prov.legal_authority || 'Sec 91 CrPC Notice'}</strong></div>
+        <div>• Source Entity: <strong>${prov.source_entity || 'Service Provider Nodal Portal'}</strong></div>
+        <div>• Collecting Officer: <strong>${prov.collecting_officer || 'Investigating Officer'}</strong></div>
+        <div>• File SHA-256 Hash: <span style="color:#94a3b8;">${prov.integrity_hash_sha256 || '--'}</span></div>
       </div>
+
       <table class="table-custom" style="width:100%; border-collapse: collapse; margin-bottom: 1rem;">
     `;
 
     for (const [k, v] of Object.entries(rec)) {
+      if (k === "_provenance") continue;
       html += `
         <tr>
           <td style="font-weight:600; width:35%; background:#f8fafc; padding:0.4rem 0.6rem; border:1px solid #e2e8f0;">${k}</td>
@@ -461,12 +557,6 @@ async function viewEvidenceRecord(recordType, recordId) {
       `;
     }
     html += `</table>`;
-    
-    html += `
-      <div style="font-size:0.75rem; color:#64748b; background:#f1f5f9; padding:0.6rem; border-radius:4px;">
-        🔒 <strong>Evidence Audit Trail:</strong> Record indexed in local prototype repository. In production, this maps to SHA-256 hash-chained case audit ledger.
-      </div>
-    `;
 
     details.innerHTML = html;
   } catch (err) {

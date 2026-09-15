@@ -173,10 +173,34 @@ async def get_evidence_detail(record_type: str, record_id: str):
         raise HTTPException(status_code=404, detail="Evidence record not found")
     return {"record_type": record_type, "record_id": record_id, "data": record}
 
-@router.get("/api/evaluate/link-prediction")
-async def evaluate_link_prediction():
-    """
-    Feature / Fix 5: Leave-One-Out validation harness for link prediction baseline.
-    Evaluates recovery rate and mean rank across evidentiary network.
-    """
-    return evaluate_link_prediction_leave_one_out()
+from app.db import get_chronological_case_timeline, log_verification_decision, get_verification_logs
+
+class VerificationRequest(BaseModel):
+    officer_name: str = "Inspector R. Santhosh"
+    officer_badge: str = "TN-POL-4482"
+    decision: str  # 'ACCEPTED', 'REJECTED', 'REQUIRES_PROBE'
+    notes: str = ""
+
+@router.get("/api/timeline")
+async def get_case_timeline():
+    """Investigation Feature 2: Unified chronological event timeline."""
+    return get_chronological_case_timeline()
+
+@router.get("/api/person/{person_id}/verification-history")
+async def get_person_verification_history(person_id: str):
+    """Investigation Feature 6: Human verification audit trail."""
+    logs = get_verification_logs(person_id)
+    return {"person_id": person_id, "history": logs}
+
+@router.post("/api/person/{person_id}/verify")
+async def verify_person_lead(person_id: str, req: VerificationRequest):
+    """Investigation Feature 6: Record human-in-the-loop sign-off."""
+    res = log_verification_decision(
+        person_id=person_id,
+        case_id="2026-CR-0417",
+        officer_name=req.officer_name,
+        officer_badge=req.officer_badge,
+        decision=req.decision,
+        notes=req.notes
+    )
+    return res

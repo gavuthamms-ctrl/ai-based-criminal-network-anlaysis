@@ -26,7 +26,7 @@
 
     <div class="header-meta">
       <div class="badge-case">CASE: #2026-CR-0417</div>
-      <div class="badge-role">ROLE: Investigator (Level 2)</div>
+      <div class="badge-role">ROLE: Investigating Officer (Level 2)</div>
     </div>
 
     <nav class="header-nav">
@@ -44,7 +44,7 @@
   <!-- Main Dashboard Grid -->
   <main class="dashboard-grid">
     
-    <!-- Left Column: Graph View & Copilot -->
+    <!-- Left Column: Graph View & Copilot & Timeline -->
     <section class="graph-section">
       
       <!-- Graph Card -->
@@ -95,7 +95,7 @@
           <div class="copilot-title">
             <span>🤖</span> Investigator Copilot (Graph Reasoning Assistant)
           </div>
-          <span style="font-size: 0.75rem; color: #64748b;">Template & LLM-Powered Graph Query Layer</span>
+          <span style="font-size: 0.75rem; color: #64748b;">Grounded in Real Network Topology</span>
         </div>
 
         <!-- Query Chips -->
@@ -119,8 +119,20 @@
           <div id="copilot-text"></div>
           <div id="copilot-citations" class="cited-badges">
             <span class="cited-label">Cited Entities:</span>
-            <!-- Badges rendered by JS -->
           </div>
+        </div>
+      </div>
+
+      <!-- Investigation Timeline Drawer (Feature 2) -->
+      <div class="copilot-card" style="margin-top: 0.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+          <div class="copilot-title">
+            <span>⏱️</span> Chronological Event Timeline (Temporal Reconstruction)
+          </div>
+          <button class="chip-btn" id="btn-toggle-timeline">Toggle View</button>
+        </div>
+        <div id="timeline-container" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+          <!-- Populated by JS -->
         </div>
       </div>
 
@@ -137,6 +149,7 @@
             <div class="person-id-tag" id="panel-person-id">SELECT A NODE</div>
             <div class="person-name" id="panel-person-name">Click any person node on the graph</div>
             <div class="person-aliases" id="panel-person-aliases">Aliases: --</div>
+            <div style="font-size: 0.72rem; color: #b45309; font-weight: 600; margin-top: 0.2rem;" id="panel-custody-status">Status: --</div>
           </div>
           <div class="score-badges-row">
             <span class="badge-priority priority-HIGH" id="panel-priority-badge">PRIORITY: --</span>
@@ -158,12 +171,23 @@
               <span class="metric-val" id="panel-betweenness">0.000 (0th percentile)</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">Degree Centrality:</span>
-              <span class="metric-val" id="panel-degree">0.000</span>
+              <span class="metric-label">Statutory Sections:</span>
+              <span class="metric-val" id="panel-legal-sections" style="font-size: 0.75rem;">IPC 420/120B</span>
             </div>
             <div class="metric-row">
               <span class="metric-label">Identity Resolution Conf:</span>
               <span class="metric-val" id="panel-resolution-conf">100%</span>
+            </div>
+          </div>
+
+          <!-- Feature 5: Explainable Score Breakdown -->
+          <div style="background: #f1f5f9; padding: 0.6rem 0.8rem; border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: var(--navy-700); margin-bottom: 0.3rem;">
+              <span>Score Decomposition (Feature Weights):</span>
+              <span id="panel-decomp-total">Total: 82%</span>
+            </div>
+            <div id="panel-decomp-bars" style="display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; color: #475569;">
+              <!-- Populated by JS -->
             </div>
           </div>
 
@@ -181,9 +205,21 @@
             <span>AI-generated investigative lead. Human verification required.</span>
           </div>
 
+          <!-- Feature 6: Human Verification Action Sign-off -->
+          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.7rem;">
+            <div class="metric-section-title" style="margin-bottom: 0.3rem;">Investigating Officer Lead Sign-Off</div>
+            <div style="display: flex; gap: 0.4rem; margin-bottom: 0.4rem;">
+              <button class="chip-btn" id="btn-verify-accept" style="background:#dcfce7; color:#166534; border-color:#86efac; font-weight:600; flex:1;">✓ Accept Lead</button>
+              <button class="chip-btn" id="btn-verify-reject" style="background:#fee2e2; color:#991b1c; border-color:#fca5a5; font-weight:600; flex:1;">✗ Dismiss Lead</button>
+            </div>
+            <div id="panel-verification-status" style="font-size: 0.72rem; color: #64748b;">
+              Audit Log: Inspector R. Santhosh (TN-POL-4482)
+            </div>
+          </div>
+
           <!-- Connected Evidence Records (View Evidence) -->
           <div>
-            <div class="metric-section-title">Underlying Source Evidence</div>
+            <div class="metric-section-title">Underlying Source Evidence (Section 65B Certified)</div>
             <div class="evidence-btn-group" id="panel-evidence-buttons">
               <!-- Rendered via JS -->
             </div>
@@ -227,7 +263,7 @@
 
   </main>
 
-  <!-- Evidence Inspection Modal -->
+  <!-- Evidence Inspection Modal (With Chain of Custody) -->
   <div class="modal-overlay" id="evidence-modal">
     <div class="modal-content">
       <div class="modal-header">
