@@ -4,8 +4,9 @@ import re
 from typing import Dict, Any, List, Optional
 from app.config import settings
 
-# Verify this model name is still current in Google AI Studio before demo day — SDK/model names change.
-GEMINI_MODEL_NAME = "gemini-1.5-flash"
+# Active current Gemini model names
+GEMINI_MODEL_NAMES = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-pro"]
+GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
 # Attempt to configure google-generativeai
 gemini_available = False
@@ -19,16 +20,27 @@ except Exception as e:
     gemini_available = False
 
 
+def get_configured_model():
+    """Returns a configured GenerativeModel with automatic version fallback."""
+    if not gemini_available or not settings.GEMINI_API_KEY:
+        return None
+    import google.generativeai as genai
+    for m_name in GEMINI_MODEL_NAMES:
+        try:
+            return genai.GenerativeModel(m_name)
+        except Exception:
+            continue
+    return None
+
+
 def extract_entities_relationships(fir_text: str) -> Dict[str, Any]:
     """
     Job 1: Extract entities (people, phones, vehicles, accounts) and implied relationships
     from a raw FIR narrative.
     """
-    if gemini_available and settings.GEMINI_API_KEY:
+    model = get_configured_model()
+    if model:
         try:
-            import google.generativeai as genai
-            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
-            
             prompt = f"""
 You are an expert NLP entity and relationship extraction tool for criminal case investigation narratives (First Information Reports - FIRs).
 Analyze the following FIR narrative and extract:
@@ -145,11 +157,9 @@ def explain_person(person_id: str, person_data: Dict[str, Any], graph_metrics: D
 
     confidence_pct = min(95, max(60, int(betweenness_pct * 0.4 + len(cdrs) * 5 + len(txns) * 10 + len(firs) * 15)))
 
-    if gemini_available and settings.GEMINI_API_KEY:
+    model = get_configured_model()
+    if model:
         try:
-            import google.generativeai as genai
-            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
-            
             prompt = f"""
 You are an objective investigative intelligence assistant for a criminal network analysis platform.
 Generate a strictly factual, concise 2 to 4 sentence explanation justifying why person {person_id} ({person_data.get('display_name')}) is flagged with priority {priority} and role "{role}".
@@ -220,26 +230,26 @@ The response MUST end with the EXACT sentence: "{fixed_disclaimer}"
 
 def answer_graph_query(natural_language_question: str, graph_json: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Job 3: Answers investigator graph queries (e.g. "who connects P17 and P22?"),
+    Job 3: Answers investigator graph queries (e.g. "who connects P17 and P22?" or general queries),
     returning answer text and specific node_ids / edge_ids to highlight on the UI graph.
     """
     nodes = graph_json.get("nodes", [])
     edges = graph_json.get("edges", [])
     
-    if gemini_available and settings.GEMINI_API_KEY:
+    model = get_configured_model()
+    if model:
         try:
-            import google.generativeai as genai
-            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
-            
             prompt = f"""
 You are the Investigator Copilot for the NexusTrace criminal network intelligence system.
-Answer the investigator's question based STRICTLY on the provided knowledge graph JSON.
-Never invent links or nodes that do not exist.
+Answer the investigator's question based on the provided knowledge graph JSON, criminal intelligence methodology, or investigative domain context.
+If the question asks about specific suspects or paths in this network, cite their exact node IDs and edge IDs in cited_nodes and cited_edges.
+If the question is a general concept or domain question (e.g. "what is criminal analysis"), provide an insightful, direct, professional response with cited_nodes: [] and cited_edges: [].
+
 Return ONLY a JSON response in the following format:
 {{
-  "answer": "Plain-text factual answer referencing nodes and evidence paths.",
-  "cited_nodes": ["P17", "P31", "P22"],
-  "cited_edges": ["e_P17_P31", "e_P31_P22"]
+  "answer": "Plain-text factual or domain answer.",
+  "cited_nodes": ["P17", "P31"],
+  "cited_edges": ["e_P17_P31"]
 }}
 
 Question: "{natural_language_question}"
@@ -256,21 +266,17 @@ Graph Edges:
                 clean_text = re.sub(r"^```json\s*|^```\s*|```$", "", clean_text, flags=re.MULTILINE).strip()
             res = json.loads(clean_text)
             
-            # FIX 1: Ground Gemini's citations against the real graph
-            # Gemini's citations are filtered against the actual graph so the system can never surface a node/edge that doesn't exist — explanations must be grounded, not invented.
+            # Ground citations against the actual graph
             valid_node_ids = {n["id"] for n in nodes}
             valid_edge_ids = {e["id"] for e in edges}
 
             filtered_nodes = [nid for nid in res.get("cited_nodes", []) if nid in valid_node_ids]
             filtered_edges = [eid for eid in res.get("cited_edges", []) if eid in valid_edge_ids]
 
-            # If both are empty after filtering, fall back to rule-based solver
-            if not filtered_nodes and not filtered_edges:
-                raise ValueError("Gemini returned no valid grounded citations for this graph.")
-
             res["cited_nodes"] = filtered_nodes
             res["cited_edges"] = filtered_edges
-            return res
+            if res.get("answer"):
+                return res
         except Exception as e:
             print(f"Gemini answer_graph_query failed, running graph query solver: {e}")
 
