@@ -326,7 +326,7 @@ class NetworkGraphManager:
             vis_nodes.append({
                 "id": node_id,
                 "label": f"{p_name}\n({node_id})",
-                "title": f"<b>{p_name}</b> ({node_id})<br>Role: {metric.get('network_role')}<br>Status: {metric.get('custody_status')}<br>Sections: {metric.get('legal_sections')}",
+                "title": f"{p_name} ({node_id})\nRole: {metric.get('network_role')}\nStatus: {metric.get('custody_status')}\nSections: {metric.get('legal_sections')}",
                 "color": node_color,
                 "size": size,
                 "shape": shape,
@@ -363,7 +363,7 @@ class NetworkGraphManager:
                 "dashes": style["dashes"],
                 "width": style["width"],
                 "font": {"size": 11, "align": "middle", "color": "#475569", "background": "rgba(255,255,255,0.85)"},
-                "title": f"<b>Tier: {tier.replace('_', ' ').title()}</b><br>Channel: {data.get('channel')}<br>Source: {data.get('source_record_id')}<br>Frequency: {data.get('frequency', 1)}",
+                "title": f"Tier: {tier.replace('_', ' ').title()}\nChannel: {data.get('channel')}\nSource: {data.get('source_record_id')}\nFrequency: {data.get('frequency', 1)}",
                 "arrows": {"to": {"enabled": False}},
                 "data": {
                     "edge_id": data.get("edge_id"),
