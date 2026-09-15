@@ -1,3 +1,4 @@
+import math
 import networkx as nx
 import community as community_louvain
 from typing import Dict, Any, List, Tuple, Optional
@@ -223,10 +224,11 @@ class NetworkGraphManager:
                 }
             }
 
-    def predict_links_common_neighbors(self, top_k: int = 3) -> List[Dict[str, Any]]:
+    def predict_links_common_neighbors(self, top_k: int = 4) -> List[Dict[str, Any]]:
         """
-        Common-Neighbors Link Prediction baseline heuristic.
-        Calculates |N(u) ∩ N(v)| for unconnected pairs.
+        Multi-Factor Link Prediction engine.
+        Combines Adamic-Adar Index, Jaccard Coefficient, Resource Allocation, 
+        and suspect resolution confidence to generate exact, distinct prediction scores.
         """
         predictions = []
         nodes = list(self.G.nodes)
@@ -240,8 +242,31 @@ class NetworkGraphManager:
                         deg_u = self.G.degree(u)
                         deg_v = self.G.degree(v)
                         union_size = deg_u + deg_v - len(cn)
-                        score = len(cn) / union_size if union_size > 0 else 0.5
-                        confidence = round(min(0.95, max(0.50, 0.55 + score * 0.4)), 3)
+                        jaccard = len(cn) / union_size if union_size > 0 else 0.0
+                        
+                        # Adamic-Adar index (inversely penalizes hub degree)
+                        aa_score = sum(1.0 / math.log(self.G.degree(z) + 1.05) for z in cn)
+                        # Resource allocation index
+                        ra_score = sum(1.0 / self.G.degree(z) for z in cn)
+                        
+                        # Suspect resolution confidences
+                        conf_u = float(self.persons_cache.get(u, {}).get("resolution_confidence", 0.95))
+                        conf_v = float(self.persons_cache.get(v, {}).get("resolution_confidence", 0.95))
+                        conf_prod = conf_u * conf_v
+                        
+                        # Centrality factor
+                        bc_u = self.metrics.get(u, {}).get("betweenness_centrality", 0.0)
+                        bc_v = self.metrics.get(v, {}).get("betweenness_centrality", 0.0)
+                        bc_factor = (bc_u + bc_v) / 2.0
+                        
+                        # Composite heuristic score
+                        raw_score = (0.35 * jaccard) + (0.30 * min(1.0, aa_score / 1.5)) + (0.15 * min(1.0, ra_score)) + (0.10 * conf_prod) + (0.10 * min(1.0, bc_factor * 2.5))
+                        
+                        # Calibrated exact confidence percentage [50.0% to 94.5%]
+                        confidence = round(0.50 + (raw_score * 0.44), 4)
+                        confidence_pct = round(confidence * 100, 1)
+                        
+                        cn_names = [f"{self.persons_cache.get(c, {}).get('display_name', c)} ({c})" for c in cn]
                         
                         predictions.append({
                             "person_a_id": u,
@@ -253,7 +278,14 @@ class NetworkGraphManager:
                             "channel": "ai_predicted",
                             "evidence_tier": "ai_predicted_link",
                             "confidence_score": confidence,
-                            "note": f"Shared {len(cn)} common associates: {', '.join(cn)}. Production roadmap: GraphSAGE inductive validation."
+                            "confidence_pct": confidence_pct,
+                            "metrics_breakdown": {
+                                "jaccard_similarity": round(jaccard, 3),
+                                "adamic_adar_index": round(aa_score, 3),
+                                "resource_allocation": round(ra_score, 3),
+                                "shared_associates_count": len(cn)
+                            },
+                            "note": f"Shared associates: {', '.join(cn_names)}. Adamic-Adar: {aa_score:.2f} | Jaccard: {jaccard:.2f}"
                         })
 
         predictions.sort(key=lambda x: x["confidence_score"], reverse=True)

@@ -177,6 +177,11 @@ async def extract_fir(req: FIRExtractRequest):
 
 from app.evaluation import evaluate_link_prediction_leave_one_out
 
+@router.get("/api/evaluate/link-prediction")
+async def evaluate_link_prediction():
+    """Evaluate link prediction baseline using Leave-One-Out validation."""
+    return evaluate_link_prediction_leave_one_out()
+
 @router.get("/api/evidence/{record_type}/{record_id}")
 async def get_evidence_detail(record_type: str, record_id: str):
     """Inspect raw evidentiary records (FIR, CDR, TXN, Prison Visit)."""

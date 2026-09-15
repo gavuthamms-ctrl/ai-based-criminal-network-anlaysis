@@ -245,15 +245,16 @@ function renderPredictions(predictions) {
 
   predictions.forEach(p => {
     const predEdgeId = `pred_${p.person_a_id}_${p.person_b_id}`;
+    const scoreVal = p.confidence_pct ? p.confidence_pct : (p.confidence_score * 100).toFixed(1);
     const item = document.createElement("div");
     item.className = "prediction-item";
     item.id = `card_${predEdgeId}`;
     item.innerHTML = `
       <div class="prediction-header">
         <span class="prediction-pair">${p.person_a_name} ↔ ${p.person_b_name}</span>
-        <span class="prediction-conf" id="badge_${predEdgeId}">SCORE: ${(p.confidence_score * 100).toFixed(0)}%</span>
+        <span class="prediction-conf" id="badge_${predEdgeId}">SCORE: ${scoreVal}%</span>
       </div>
-      <div style="font-size:0.72rem; color:#7f1d1d; margin-top:0.2rem;">
+      <div style="font-size:0.72rem; color:#7f1d1d; margin-top:0.2rem; line-height:1.35;">
         ${p.note}
       </div>
       <div style="font-size:0.68rem; color:#dc2626; margin-top:0.3rem; font-weight:600;" id="status_${predEdgeId}">
@@ -272,6 +273,7 @@ function togglePredictedEdge(p, predEdgeId) {
   const existing = edgesDataSet.get(predEdgeId);
   const statusLabel = document.getElementById(`status_${predEdgeId}`);
   const card = document.getElementById(`card_${predEdgeId}`);
+  const scoreVal = p.confidence_pct ? p.confidence_pct : (p.confidence_score * 100).toFixed(1);
 
   if (existing) {
     edgesDataSet.remove(predEdgeId);
@@ -282,12 +284,12 @@ function togglePredictedEdge(p, predEdgeId) {
       id: predEdgeId,
       from: p.person_a_id,
       to: p.person_b_id,
-      label: `ai_predicted (${Math.round(p.confidence_score * 100)}%)`,
+      label: `ai_predicted (${scoreVal}%)`,
       color: { color: "#ef4444", highlight: "#b91c1c", hover: "#dc2626" },
       dashes: [4, 4],
       width: 2.2,
       font: { size: 11, align: "middle", color: "#dc2626", background: "rgba(255,255,255,0.95)" },
-      title: "AI-Predicted — not a database-backed relationship (Score: " + Math.round(p.confidence_score * 100) + "%)",
+      title: `AI-Predicted — Undocumented candidate relationship (Score: ${scoreVal}%)`,
       arrows: { to: { enabled: false } }
     });
 

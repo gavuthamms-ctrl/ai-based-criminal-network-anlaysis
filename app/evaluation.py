@@ -1,3 +1,4 @@
+import math
 import networkx as nx
 from typing import Dict, Any, List
 from app.graph_engine import graph_manager
@@ -30,17 +31,23 @@ def evaluate_link_prediction_leave_one_out() -> Dict[str, Any]:
         g_temp = original_g.copy()
         g_temp.remove_edge(u, v)
 
-        # Score all non-edges in g_temp using Common Neighbors
+        # Score all non-edges in g_temp using Multi-Factor Link Prediction (Adamic-Adar + Jaccard)
         candidate_scores = []
         for i in range(len(nodes)):
             for j in range(i + 1, len(nodes)):
                 n1, n2 = nodes[i], nodes[j]
                 if not g_temp.has_edge(n1, n2):
                     cn = list(nx.common_neighbors(g_temp, n1, n2))
-                    deg1 = g_temp.degree(n1)
-                    deg2 = g_temp.degree(n2)
-                    union_size = deg1 + deg2 - len(cn)
-                    score = (len(cn) / union_size) if union_size > 0 else 0.0
+                    if cn:
+                        deg1 = g_temp.degree(n1)
+                        deg2 = g_temp.degree(n2)
+                        union_size = deg1 + deg2 - len(cn)
+                        jaccard = (len(cn) / union_size) if union_size > 0 else 0.0
+                        aa = sum(1.0 / math.log(g_temp.degree(z) + 1.05) for z in cn)
+                        ra = sum(1.0 / g_temp.degree(z) for z in cn)
+                        score = (0.45 * jaccard) + (0.35 * min(1.0, aa / 1.5)) + (0.20 * min(1.0, ra))
+                    else:
+                        score = 0.0
                     candidate_scores.append((n1, n2, score, len(cn)))
 
         # Sort candidate non-edges descending by score
