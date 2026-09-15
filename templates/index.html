@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NexusTrace — AI Criminal Network Analysis Dashboard</title>
+  
+  <!-- Vis.js Network CDN -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Top Case Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-icon">NT</div>
+      <div>
+        <div class="brand-title">NexusTrace</div>
+        <div class="brand-subtitle">SIH26189 — Criminal Network Intelligence Platform</div>
+      </div>
+    </div>
+
+    <div class="header-meta">
+      <div class="badge-case">CASE: #2026-CR-0417</div>
+      <div class="badge-role">ROLE: Investigator (Level 2)</div>
+    </div>
+
+    <nav class="header-nav">
+      <a href="/" class="nav-link-btn active">Network Graph</a>
+      <a href="/fir-ingest" class="nav-link-btn">FIR Ingestion Demo</a>
+    </nav>
+  </header>
+
+  <!-- Ethical Guardrail Alert Banner -->
+  <div class="guardrail-alert-banner">
+    <span class="guard-icon">⚠️</span>
+    <span><strong>Investigative Safeguard:</strong> This system produces labeled investigative leads with confidence scores. Every AI-generated flag requires human verification and is not a determination of guilt.</span>
+  </div>
+
+  <!-- Main Dashboard Grid -->
+  <main class="dashboard-grid">
+    
+    <!-- Left Column: Graph View & Copilot -->
+    <section class="graph-section">
+      
+      <!-- Graph Card -->
+      <div class="graph-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🌐</span> Multi-Source Network Graph (Case #2026-CR-0417)
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="chip-btn" id="btn-fit-graph" title="Center & Zoom Graph">Fit View</button>
+            <button class="chip-btn" id="btn-reset-highlight" title="Clear Selections">Reset Highlights</button>
+          </div>
+        </div>
+
+        <div class="graph-canvas-container">
+          <div id="network-canvas"></div>
+        </div>
+
+        <!-- Evidence Tier Visual Legend -->
+        <div class="evidence-legend">
+          <span class="legend-title">Evidence Tiers:</span>
+          
+          <div class="legend-item" title="Explicitly documented in case FIR / official record">
+            <span class="legend-line line-direct"></span>
+            <span>Direct Evidence (FIR)</span>
+          </div>
+
+          <div class="legend-item" title="Corroborated across multiple independent sources (CDR + Financial)">
+            <span class="legend-line line-corroborated"></span>
+            <span>Corroborated Association</span>
+          </div>
+
+          <div class="legend-item" title="Derived from network centrality and prison visitation topology">
+            <span class="legend-line line-inference"></span>
+            <span>Analytical Inference</span>
+          </div>
+
+          <div class="legend-item" title="Predicted by link prediction model with confidence rating">
+            <span class="legend-line line-predicted"></span>
+            <span>AI-Predicted Link</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Investigator Copilot Card -->
+      <div class="copilot-card">
+        <div class="copilot-header">
+          <div class="copilot-title">
+            <span>🤖</span> Investigator Copilot (Graph Reasoning Assistant)
+          </div>
+          <span style="font-size: 0.75rem; color: #64748b;">Template & LLM-Powered Graph Query Layer</span>
+        </div>
+
+        <!-- Query Chips -->
+        <div class="copilot-chips">
+          <button class="chip-btn copilot-chip" data-q="Who connects P17 and P22?">Who connects P17 and P22?</button>
+          <button class="chip-btn copilot-chip" data-q="Identify key coordinators bridging clusters">Identify key coordinators</button>
+          <button class="chip-btn copilot-chip" data-q="Show the connection path between P05 and P17">Path between P05 and P17</button>
+          <button class="chip-btn copilot-chip" data-q="Summarize the entire evidentiary network">Network Summary</button>
+        </div>
+
+        <!-- Input Box -->
+        <div class="copilot-input-row">
+          <input type="text" id="copilot-input" class="copilot-input" placeholder="Ask a question about the criminal network (e.g. 'Who connects P17 and P22?')..." />
+          <button id="copilot-submit" class="copilot-submit-btn">
+            <span>Query</span> ➔
+          </button>
+        </div>
+
+        <!-- Copilot Response Area -->
+        <div id="copilot-response" class="copilot-response-box">
+          <div id="copilot-text"></div>
+          <div id="copilot-citations" class="cited-badges">
+            <span class="cited-label">Cited Entities:</span>
+            <!-- Badges rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Right Column: "Why This Person?" Panel & Predictions -->
+    <aside class="side-panel">
+      
+      <!-- "Why This Person?" Card -->
+      <div class="person-detail-card" id="why-this-person-panel">
+        
+        <div class="person-header">
+          <div>
+            <div class="person-id-tag" id="panel-person-id">SELECT A NODE</div>
+            <div class="person-name" id="panel-person-name">Click any person node on the graph</div>
+            <div class="person-aliases" id="panel-person-aliases">Aliases: --</div>
+          </div>
+          <div class="score-badges-row">
+            <span class="badge-priority priority-HIGH" id="panel-priority-badge">PRIORITY: --</span>
+            <span class="badge-confidence" id="panel-confidence-badge">CONF: --%</span>
+          </div>
+        </div>
+
+        <div class="person-body">
+          
+          <!-- Role & Centrality -->
+          <div>
+            <div class="metric-section-title">Network Structural Analysis</div>
+            <div class="metric-row">
+              <span class="metric-label">Identified Role:</span>
+              <span class="metric-val" id="panel-role">Bridge / Coordinator Candidate</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Betweenness Centrality:</span>
+              <span class="metric-val" id="panel-betweenness">0.000 (0th percentile)</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Degree Centrality:</span>
+              <span class="metric-val" id="panel-degree">0.000</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Identity Resolution Conf:</span>
+              <span class="metric-val" id="panel-resolution-conf">100%</span>
+            </div>
+          </div>
+
+          <!-- Plain Language Explanation -->
+          <div>
+            <div class="metric-section-title">Plain-Language Justification (Gemini / Engine)</div>
+            <div class="explanation-box" id="panel-explanation-text">
+              Select an individual node on the left network visualization to inspect calculated centrality metrics, cross-source evidence records, and plain-language explanation.
+            </div>
+          </div>
+
+          <!-- Mandatory AI Disclaimer Banner -->
+          <div class="ai-warning-box">
+            <span>🛡️</span>
+            <span>AI-generated investigative lead. Human verification required.</span>
+          </div>
+
+          <!-- Connected Evidence Records (View Evidence) -->
+          <div>
+            <div class="metric-section-title">Underlying Source Evidence</div>
+            <div class="evidence-btn-group" id="panel-evidence-buttons">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div style="margin-top: 0.25rem;">
+            <button class="chip-btn" id="btn-reexplain" style="width: 100%; padding: 0.5rem; text-align: center;">
+              🔄 Re-run Live Gemini Explanation
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Baseline Link Prediction Card -->
+      <div class="predictions-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+          <div class="metric-section-title" style="margin-bottom: 0;">AI Link Predictions (Common-Neighbors)</div>
+          <span style="font-size: 0.7rem; color: #dc2626; font-weight: 700;">UNDOCUMENTED</span>
+        </div>
+        <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.75rem;">
+          Heuristic baseline identifying plausible undocumented connections. <em>(Production roadmap: GraphSAGE GNN inductive validation)</em>
+        </p>
+        <div id="predictions-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Evidence Inspection Modal -->
+  <div class="modal-overlay" id="evidence-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title" style="font-size: 1rem; color: var(--navy-900);">Evidence Record Details</h3>
+        <button class="modal-close-btn" id="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-content-details"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

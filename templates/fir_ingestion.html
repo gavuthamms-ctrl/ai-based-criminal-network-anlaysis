@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NexusTrace — FIR Ingestion & NLP Entity Extraction Demo</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    .fir-container {
+      max-width: 1200px;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      width: 100%;
+    }
+    .fir-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .fir-textarea {
+      width: 100%;
+      height: 160px;
+      padding: 0.85rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      resize: vertical;
+      margin: 0.75rem 0;
+    }
+    .fir-textarea:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+    .extraction-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .extract-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    .extract-box-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--navy-700);
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .tag-item {
+      background: #e2e8f0;
+      color: #1e293b;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+    .table-custom {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.75rem;
+      font-size: 0.82rem;
+    }
+    .table-custom th, .table-custom td {
+      border: 1px solid #e2e8f0;
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+    }
+    .table-custom th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: var(--navy-700);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-icon">NT</div>
+      <div>
+        <div class="brand-title">NexusTrace</div>
+        <div class="brand-subtitle">SIH26189 — Multi-Source Ingestion Engine</div>
+      </div>
+    </div>
+
+    <div class="header-meta">
+      <div class="badge-case">MODULE: NLP Entity Extraction</div>
+      <div class="badge-role">CCTNS Ingestion Abstraction Ready</div>
+    </div>
+
+    <nav class="header-nav">
+      <a href="/" class="nav-link-btn">Network Graph</a>
+      <a href="/fir-ingest" class="nav-link-btn active">FIR Ingestion Demo</a>
+    </nav>
+  </header>
+
+  <div class="guardrail-alert-banner">
+    <span class="guard-icon">ℹ️</span>
+    <span><strong>NLP Ingestion Demo:</strong> Demonstrates extracting structured entities (names, aliases, phones, vehicles, bank accounts) and implied relationships directly from unstructured FIR case narratives.</span>
+  </div>
+
+  <div class="fir-container">
+    
+    <div class="fir-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h2 style="font-size: 1.1rem; color: var(--navy-900);">Raw Case Narrative (FIR / Witness Statement)</h2>
+        <span style="font-size: 0.75rem; color: #64748b;">Supported: English, Tamil transliteration, Hinglish</span>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <span style="font-size: 0.8rem; font-weight: 600; align-self: center; color: #64748b;">Load Sample:</span>
+        <button class="chip-btn sample-btn" data-sample="1">Sample 1: Anna Nagar Fraud Syndicate</button>
+        <button class="chip-btn sample-btn" data-sample="2">Sample 2: Tambaram Narcotics & Hawala</button>
+        <button class="chip-btn sample-btn" data-sample="3">Sample 3: Interstate Vehicle Smuggling</button>
+      </div>
+
+      <textarea id="fir-input" class="fir-textarea" placeholder="Paste unstructured First Information Report (FIR) narrative here..."></textarea>
+
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button id="btn-extract" class="copilot-submit-btn" style="padding: 0.6rem 1.25rem;">
+          <span>⚡ Run Entity & Relationship Extraction</span>
+        </button>
+        <span id="extraction-status" style="font-size: 0.8rem; color: #64748b;"></span>
+      </div>
+    </div>
+
+    <!-- Extraction Results Section -->
+    <div class="fir-card" id="extraction-results" style="display: none;">
+      <h2 style="font-size: 1.05rem; color: var(--navy-900); margin-bottom: 0.75rem;">
+        Extracted Structured Entities (Preview)
+      </h2>
+
+      <div class="extraction-grid">
+        <!-- Persons -->
+        <div class="extract-box">
+          <div class="extract-box-title">👤 Identified Persons & Roles</div>
+          <div id="res-persons" style="font-size: 0.82rem; line-height: 1.6;"></div>
+        </div>
+
+        <!-- Phone Numbers -->
+        <div class="extract-box">
+          <div class="extract-box-title">📱 Phone / Mobile Numbers</div>
+          <div id="res-phones" class="tag-list"></div>
+        </div>
+
+        <!-- Vehicles -->
+        <div class="extract-box">
+          <div class="extract-box-title">🚗 Vehicle Registration Numbers</div>
+          <div id="res-vehicles" class="tag-list"></div>
+        </div>
+
+        <!-- Bank Accounts -->
+        <div class="extract-box">
+          <div class="extract-box-title">💳 Bank Account Numbers</div>
+          <div id="res-accounts" class="tag-list"></div>
+        </div>
+      </div>
+
+      <!-- Relationships Table -->
+      <div style="margin-top: 1.25rem;">
+        <div class="extract-box-title">🔗 Extracted Implied Relationships</div>
+        <table class="table-custom">
+          <thead>
+            <tr>
+              <th>Source Entity</th>
+              <th>Target Entity</th>
+              <th>Relationship Channel</th>
+              <th>Evidentiary Quote / Context</th>
+            </tr>
+          </thead>
+          <tbody id="res-relationships-tbody">
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 1rem; font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.6rem; border-radius: 4px;">
+        📌 <strong>Entity Resolution Note:</strong> In the full pipeline, these extracted entities pass through weighted similarity resolution (phone/vehicle exact matching + RapidFuzz alias deduplication) before being linked into the main NetworkX knowledge graph.
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/js/fir.js"></script>
+</body>
+</html>
