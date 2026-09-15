@@ -6,6 +6,7 @@ let edgesDataSet = null;
 let nodesDataSet = null;
 let currentSelectedPersonId = "P17";
 let activeCaseId = "2026-CR-0417";
+let currentCaseId = "2026-CR-0417";
 
 document.addEventListener("DOMContentLoaded", () => {
   setupCaseSelector();
@@ -24,6 +25,7 @@ function setupCaseSelector() {
 
   selector.addEventListener("change", (e) => {
     activeCaseId = e.target.value;
+    currentCaseId = e.target.value;
     loadCaseData(activeCaseId);
   });
 }
